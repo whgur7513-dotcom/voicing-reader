@@ -42,7 +42,7 @@
   }
 
   // ---------- 오디오 ----------
-  var ctx = null, master = null, ksCache = {};
+  var ctx = null, master = null, ksCache = {}, preloaded = false;
   function ensureAudio() {
     if (!ctx) {
       try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* 미지원 */ }
@@ -57,6 +57,7 @@
       var b = ctx.createBufferSource(); b.buffer = ctx.createBuffer(1, 1, 22050); b.connect(ctx.destination); b.start(0);
     }
     if (ctx.state !== 'running') ctx.resume();
+    if (!preloaded) { preloaded = true; preload(currentMidis()); }
     return ctx;
   }
   ['touchend', 'click', 'keydown'].forEach(function (ev) {
@@ -104,17 +105,70 @@
       o.start(when); o.stop(when + dur + 0.05);
     });
   }
-  function playNote(m) {
+  // 실제 악기 샘플 (FluidR3_GM: 스틸 기타 D2~G5, 그랜드 피아노 C2~C6). 못 받으면 합성음으로
+  var SAMPLE_RANGE = { guitar: [38, 79], piano: [36, 84] };
+  var FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  var samples = {};
+  function sample(kind, m) {
+    var r = SAMPLE_RANGE[kind];
+    if (m < r[0] || m > r[1]) return Promise.reject(new Error('range'));
+    var key = kind + m;
+    if (!samples[key]) {
+      samples[key] = fetch('sounds/' + kind + '/' + FLAT_NAMES[m % 12] + (Math.floor(m / 12) - 1) + '.mp3')
+        .then(function (res) { if (!res.ok) throw new Error(res.status); return res.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, fail) { ctx.decodeAudioData(ab, ok, fail); }); });
+      samples[key].catch(function () { delete samples[key]; }); // 다음에 다시 시도
+    }
+    return samples[key];
+  }
+  var ringing = {}; // 기타 줄마다 울리는 소리 (같은 줄을 다시 치면 이전 소리를 멈춤)
+  function playBuffer(buf, when, vol, string) {
+    var src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf; g.gain.value = vol;
+    src.connect(g); g.connect(master);
+    src.start(when);
+    if (string !== undefined) {
+      var prev = ringing[string];
+      if (prev) { prev.g.gain.setTargetAtTime(0, when, 0.03); prev.src.stop(when + 0.2); }
+      ringing[string] = { src: src, g: g };
+    }
+  }
+  function playSound(kind, m, when, vol, string) {
+    sample(kind, m).then(function (buf) {
+      playBuffer(buf, Math.max(when, ctx.currentTime), vol, string);
+    }, function () {
+      var t = Math.max(when, ctx.currentTime);
+      if (kind === 'guitar') playGuitar(m, t); else playPiano(m, t, vol * 0.45);
+    });
+  }
+  function preload(midis) {
+    if (!ctx) return;
+    midis.forEach(function (m) { sample(state.mode, m).catch(function () {}); });
+  }
+  function playNote(m, string) {
     if (!ensureAudio()) return;
     var t = ctx.currentTime + 0.01;
-    if (state.mode === 'guitar') playGuitar(m, t); else playPiano(m, t, 0.32);
+    if (state.mode === 'guitar') playSound('guitar', m, t, 0.9, string); else playSound('piano', m, t, 0.75);
   }
   function playAll() {
     if (!ensureAudio()) return;
-    var t = ctx.currentTime + 0.02;
-    var ms = currentMidis().sort(function (a, b) { return a - b; });
-    if (state.mode === 'guitar') ms.forEach(function (m, i) { playGuitar(m, t + i * 0.04); });
-    else ms.forEach(function (m) { playPiano(m, t, 0.32 / Math.sqrt(ms.length)); });
+    if (state.mode === 'guitar') {
+      // 6번줄부터 스트럼: 모든 샘플이 준비된 뒤 한 번에 예약
+      var tm = tuningMidis(), notes = [];
+      state.guitar.forEach(function (f, s) { if (f >= 0) notes.push({ m: tm[s] + f, s: s }); });
+      Promise.all(notes.map(function (n) { return sample('guitar', n.m).catch(function () { return null; }); })).then(function (bufs) {
+        var t = ctx.currentTime + 0.02;
+        notes.forEach(function (n, i) {
+          if (bufs[i]) playBuffer(bufs[i], t + i * 0.035, 0.75, n.s); else playGuitar(n.m, t + i * 0.035);
+        });
+      });
+    } else {
+      var ms = currentMidis(), vol = 0.75 / Math.sqrt(Math.max(1, ms.length));
+      Promise.all(ms.map(function (m) { return sample('piano', m).catch(function () { return null; }); })).then(function (bufs) {
+        var t = ctx.currentTime + 0.02;
+        ms.forEach(function (m, i) { if (bufs[i]) playBuffer(bufs[i], t, vol); else playPiano(m, t, 0.32 / Math.sqrt(ms.length)); });
+      });
+    }
   }
 
   // ---------- 결과 ----------
@@ -229,7 +283,7 @@
     if (!b) return;
     var s = +b.dataset.s, f = +b.dataset.f;
     if (state.guitar[s] === f) state.guitar[s] = -1; // 같은 칸 다시 탭 → 뮤트
-    else { state.guitar[s] = f; playNote(tuningMidis()[s] + f); }
+    else { state.guitar[s] = f; playNote(tuningMidis()[s] + f, s); }
     changed();
   });
 
