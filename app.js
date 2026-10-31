@@ -539,7 +539,27 @@
       return '<button class="pick-chip" data-id="' + it.id + '"><span class="pc-diag ' + it.kind + '">' + diagram(it).svg + '</span>' + esc(E.pretty(nameOf(it))) + '</button>';
     }).join('');
     $('pickerRemove').hidden = !markAt(pickPos.l, pickPos.c);
+    placePicker();
   }
+  // 코드 고르기 창을 탭한 글자 바로 위에 (자리가 없으면 아래에) 띄움
+  function placePicker() {
+    var pk = $('chordPicker');
+    if (!pickPos || pk.hidden) return;
+    var cell = $('lyricsView').querySelector('[data-l="' + pickPos.l + '"][data-c="' + pickPos.c + '"]');
+    if (!cell) return;
+    var r = cell.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    var w = Math.min(360, vw - 24), h = pk.offsetHeight, cx = r.left + r.width / 2;
+    var left = Math.max(12, Math.min(vw - w - 12, cx - w / 2));
+    var top = r.top - h - 10, below = top < 8;
+    if (below) top = Math.min(vh - h - 8, r.bottom + 10);
+    pk.style.width = w + 'px';
+    pk.style.left = left + 'px';
+    pk.style.top = top + 'px';
+    pk.style.setProperty('--ax', (cx - left) + 'px'); // 꼬리 위치
+    pk.classList.toggle('below', below);
+  }
+  window.addEventListener('scroll', placePicker, { passive: true });
+  window.addEventListener('resize', placePicker);
 
   $('sheetGrid').addEventListener('click', function (e) {
     if (e.target.closest('[data-add]')) { sel = -1; pickPos = null; renderSheet(); openEditor({}); return; }

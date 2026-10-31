@@ -471,3 +471,19 @@ body[data-view="sheet"] .controls .chord-find, body[data-view="sheet"] .controls
 .ed-name { text-align: center; font-size: 28px; font-weight: 800; min-height: 36px; }
 .ed-name span { font-size: 14px; font-weight: 500; color: var(--muted); }
 .overlay-actions button:disabled { opacity: .4; }
+
+/* 가사 코드 고르기: 탭한 글자 위에 뜨는 말풍선 */
+.chord-picker {
+  left: auto; right: auto; bottom: auto; border: 1px solid var(--line); border-radius: 16px;
+  padding: 8px 10px 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+}
+.chord-picker::after {
+  content: ""; position: absolute; left: var(--ax, 50%); bottom: -7px; width: 12px; height: 12px; margin-left: -6px;
+  background: var(--card); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg);
+}
+.chord-picker.below::after { bottom: auto; top: -7px; transform: rotate(225deg); }
+.picker-top span { font-size: 14px; }
+.picker-top button { min-height: 40px; padding: 0 12px; }
+.picker-chips { padding-top: 8px; }
+.pick-chip { min-width: 58px; padding: 6px 8px; font-size: 14px; }
+.pc-diag svg { height: 40px; }
