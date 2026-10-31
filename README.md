@@ -53,6 +53,10 @@
 - 로컬 주소(http)로 추가한 경우 **Mac 서버가 켜져 있을 때만** 열립니다. 언제 어디서나 쓰려면 GitHub Pages·Netlify·Cloudflare Pages 같은 무료 HTTPS 호스팅에 이 폴더를 그대로 올리면 됩니다. HTTPS에서는 서비스 워커가 켜져 한 번 연 뒤 오프라인에서도 동작합니다.
 - 무음 스위치를 켜도 소리가 나도록 설정돼 있습니다(iOS 17 이상의 `navigator.audioSession`). 소리가 안 나면 볼륨을 올리고 화면을 한 번 탭해 보세요.
 
+## 기타 코드 모양 사전
+
+`guitar-shapes.js` 는 David Rubert의 [tombatossals/chords-db](https://github.com/tombatossals/chords-db) (MIT 라이선스)의 기타 코드 모양을 변환한 것입니다. 판별 엔진으로 다시 읽어 이름이 맞는 모양(1,734개)만 넣었고, 라이선스 전문은 파일 머리말에 있습니다.
+
 ## 소리 출처
 
 `sounds/` 의 기타(어쿠스틱 스틸)·피아노(어쿠스틱 그랜드) 샘플은 Frank Wen의 **FluidR3_GM** 사운드폰트(MIT 라이선스)를 음별 mp3로 변환한 [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts)에서 가져왔습니다. 샘플을 불러오지 못하면 Web Audio 합성음으로 대신 재생합니다.

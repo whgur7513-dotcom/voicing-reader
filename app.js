@@ -21,7 +21,7 @@
       if (s && Array.isArray(s.guitar) && s.guitar.length === 6 && Array.isArray(s.piano) && E.TUNINGS[s.tuning]) {
         var sheet = normSheet(s.sheet);
         return { mode: s.mode === 'piano' ? 'piano' : 'guitar', tuning: s.tuning, guitar: s.guitar, piano: s.piano,
-          sheetOpen: !!s.sheetOpen, sheet: sheet, showInfo: !!s.showInfo };
+          sheetOpen: !!s.sheetOpen, sheet: sheet, showInfo: !!s.showInfo, fingers: s.fingers || null };
       }
     } catch (e) { /* 저장소 사용 불가 — 기본값으로 */ }
     return JSON.parse(JSON.stringify(DEFAULT));
@@ -258,7 +258,8 @@
       if (f === 12 && dbl.indexOf(s) >= 0) inlay = '<span class="g-inlay" style="' + pos + '"></span>';
       return '<button class="g-cell g-fret' + (f === 1 ? ' first' : '') + '" style="--sw:' + (3 - s * 0.35).toFixed(2) + 'px" data-s="' + s +
         '" data-f="' + f + '" aria-label="' + (6 - s) + '번줄 ' + f + '프렛">' + inlay +
-        (on ? '<span class="dot' + (m === bass ? ' bass' : '') + '">' + noteName(m) + '</span>' : '') + '</button>';
+        (on ? '<span class="dot' + (m === bass ? ' bass' : '') + '">' + noteName(m) +
+          (state.fingers && state.fingers.g[s] ? '<i class="fing">' + state.fingers.g[s] + '</i>' : '') + '</span>' : '') + '</button>';
     }
     var h = [], f, s;
     if (land) {
@@ -327,6 +328,7 @@
     var b = e.target.closest('button[data-s]');
     if (!b) return;
     var s = +b.dataset.s, f = +b.dataset.f;
+    state.fingers = null; // 손으로 바꾸면 사전의 손가락 정보는 맞지 않음
     if (state.guitar[s] === f) state.guitar[s] = -1; // 같은 칸 다시 탭 → 뮤트
     else { state.guitar[s] = f; playNote(tuningMidis()[s] + f, s); }
     changed();
@@ -393,10 +395,14 @@
   function revoice(frets, n, tuning) {
     var ms = E.guitarMidis(tuning, frets).map(function (m) { return m + n; });
     if (!ms.length) return null;
+    var r = E.identify(ms), p = r.type === 'chord' && E.parseChord(r.best.name);
+    if (p) { var list = E.chordVoicings(tuning, p, 6); if (list.length) return list[0]; }
     var pcs = [];
     ms.forEach(function (m) { if (pcs.indexOf(m % 12) < 0) pcs.push(m % 12); });
     return E.findVoicing(tuning, pcs, Math.min.apply(null, ms) % 12, FRETS);
   }
+  function fingersOf(v) { return v && v.fingers ? { g: v.fingers.slice(), b: (v.barres || []).slice() } : null; }
+  function shiftFingers(fg, n) { return fg ? { g: fg.g.slice(), b: fg.b.map(function (x) { return x + n; }) } : null; }
   function fitFrets(frets, n, tuning) {
     var same = shiftFrets(frets, n);
     if (same) return same;
@@ -409,9 +415,11 @@
   function shiftCurrent(n) {
     if (state.mode === 'guitar') {
       var out = shiftFrets(state.guitar, n);
-      if (!out) {
+      if (out) state.fingers = shiftFingers(state.fingers, n);
+      else {
         out = revoice(state.guitar, n, tuningMidis());
         if (!out) { toast('잡을 수 있는 모양을 찾지 못했어요'); return; }
+        state.fingers = fingersOf(out);
         toast(n < 0 && state.guitar.indexOf(0) >= 0 ? '개방현이라 다른 모양으로 바꿨어요' : '다른 모양으로 바꿨어요');
       }
       state.guitar = out;
@@ -428,7 +436,7 @@
   var D = window.ChordDiagram;
   function diagram(it) {
     it = tv(it);
-    return it.kind === 'guitar' ? D.guitar(it.frets) : D.piano(it.midis);
+    return it.kind === 'guitar' ? D.guitar(it.frets, it.fingers) : D.piano(it.midis);
   }
   // 키 바꾸기: 담은 코드는 그대로 두고 화면에 보일 때만 옮긴다
   // (t0 = 담을 때의 키 이동값 → 실제 이동 = 지금 값 − t0)
@@ -436,8 +444,12 @@
   function tv(it) {
     var n = shiftOf(it);
     if (!n) return it;
-    return { id: it.id, kind: it.kind, tuning: it.tuning, name: transposeName(it.name, n),
-      frets: it.kind === 'guitar' ? fitFrets(it.frets, n, E.TUNINGS[it.tuning].midis) : it.frets,
+    var fr = it.kind === 'guitar' ? fitFrets(it.frets, n, E.TUNINGS[it.tuning].midis) : it.frets, fg = null;
+    if (it.kind === 'guitar') {
+      var same = shiftFrets(it.frets, n);
+      fg = same && same.join() === fr.join() ? shiftFingers(it.fingers, n) : fingersOf(fr);
+    }
+    return { id: it.id, kind: it.kind, tuning: it.tuning, name: transposeName(it.name, n), frets: fr, fingers: fg,
       midis: it.midis.map(function (m) { return m + n; }) };
   }
   function nameOf(it) { return tv(it).name; }
@@ -448,7 +460,8 @@
       : result.tones.map(function (t) { return t.name; }).join(' ');
     state.sheet.items.push({
       id: newId(), t0: state.sheet.transpose || 0, name: name, quality: shown ? shown.quality : result.label, kind: state.mode, tuning: state.tuning,
-      frets: state.guitar.slice(), midis: currentMidis().sort(function (a, b) { return a - b; })
+      frets: state.guitar.slice(), fingers: state.mode === 'guitar' ? state.fingers : null,
+      midis: currentMidis().sort(function (a, b) { return a - b; })
     });
     save();
     toast('악보에 담았어요 · ' + state.sheet.items.length + '개');
@@ -548,7 +561,7 @@
     else if (act === 'load') {
       var it = tv(items[sel]);
       state.mode = it.kind;
-      if (it.kind === 'guitar') { state.tuning = it.tuning; state.guitar = it.frets.slice(); }
+      if (it.kind === 'guitar') { state.tuning = it.tuning; state.guitar = it.frets.slice(); state.fingers = it.fingers || null; }
       else state.piano = it.midis.slice();
       state.sheetOpen = false; sel = -1;
       changed(); window.scrollTo(0, 0);
@@ -743,7 +756,7 @@
   }
   function applyFound() {
     if (found.kind === 'piano') state.piano = found.list[found.idx].slice();
-    else state.guitar = found.list[found.idx].slice();
+    else { state.guitar = found.list[found.idx].slice(); state.fingers = fingersOf(found.list[found.idx]); }
     found.keep = true; // 이번 변경으로는 목록을 닫지 않음
     changed();
     pickName(found.p);
@@ -816,7 +829,7 @@
   $('tuning').innerHTML = Object.keys(E.TUNINGS).map(function (k) {
     return '<option value="' + k + '">' + E.TUNINGS[k].label + '</option>';
   }).join('');
-  $('tuning').addEventListener('change', function () { state.tuning = this.value; changed(); });
+  $('tuning').addEventListener('change', function () { state.tuning = this.value; state.fingers = null; changed(); });
   document.querySelector('.segmented').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-mode]');
     if (!b) return;
@@ -839,7 +852,7 @@
   });
   $('playBtn').addEventListener('click', playAll);
   $('clearBtn').addEventListener('click', function () {
-    if (state.mode === 'guitar') state.guitar = [-1, -1, -1, -1, -1, -1]; else state.piano = [];
+    if (state.mode === 'guitar') { state.guitar = [-1, -1, -1, -1, -1, -1]; state.fingers = null; } else state.piano = [];
     changed();
   });
 

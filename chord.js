@@ -368,10 +368,10 @@
     all.sort(function (a, b) { return a.score - b.score; });
     var byPos = {}, out = [];
     all.forEach(function (v) {
-      var p = v.minF <= 3 ? 0 : v.minF; // 개방 자리(1~3프렛)는 하나로
+      var p = posOf(v.frets);
       if (byPos[p] === undefined) { byPos[p] = out.length; out.push(v); }
     });
-    out.sort(function (a, b) { return a.minF - b.minF; });
+    // 점수 순서(쉬운 모양 먼저)로 돌려줌. 화면에는 chordVoicings 가 자리 순서로 정렬
     return out.slice(0, limit || 6).map(function (v) { return v.frets; });
   }
 
@@ -424,16 +424,49 @@
     }).filter(function (p) { return p !== null && p !== bassPc; });
     var name = ROOT_NAMES[rootPc] + tpl.suffix + (tens.length ? '(' + tens.map(function (d) { return d.label; }).join(',') + ')' : '') +
       (bassPc !== null && bassPc !== rootPc ? '/' + ROOT_NAMES[bassPc] : '');
-    return { rootPc: rootPc, bassPc: bassPc === null ? rootPc : bassPc, suffix: tpl.suffix, pcs: pcs, optional: optional, name: name };
+    return { rootPc: rootPc, bassPc: bassPc === null ? rootPc : bassPc, suffix: tpl.suffix, tensions: tens.length, pcs: pcs, optional: optional, name: name };
   }
-  // 이름 → 기타 포지션 목록 (다 못 잡으면 5도·11도·9도를 차례로 빼고 다시)
+  // 표준 코드 모양 사전 (guitar-shapes.js, 표준 튜닝 전용). 돌려주는 프렛 배열에 fingers·barres 를 붙여 둠
+  function isStandard(tuning) { return tuning.join() === TUNINGS.standard.midis.join(); }
+  function dictShapes(p) {
+    var D = global.GUITAR_SHAPES;
+    if (!D || p.tensions) return [];
+    return (D[p.rootPc + '|' + p.suffix + '|' + p.bassPc] || []).map(function (x) {
+      var fr = x[0].slice(); fr.fingers = x[1]; fr.barres = x[2]; return fr;
+    });
+  }
+  // 자리 번호: 개방현을 쓰거나 3프렛 안에 다 들어가면 0(개방 자리), 아니면 가장 낮은 프렛
+  function posOf(frets) {
+    var fv = frets.filter(function (f) { return f > 0; });
+    if (!fv.length || frets.indexOf(0) >= 0 || Math.max.apply(null, fv) <= 3) return 0;
+    return Math.min.apply(null, fv);
+  }
+  // 이름 → 기타 포지션 목록. 자리마다 사전의 표준 모양을 먼저, 없는 자리는 자동 계산으로 채움
+  // (자동 계산이 다 못 잡으면 5도·11도·9도를 차례로 빼고 다시)
   function chordVoicings(tuning, p, limit) {
+    limit = limit || 6;
     var pcs = p.pcs.slice(), list = findVoicings(tuning, pcs, p.bassPc, limit);
     for (var i = 0; !list.length && i < p.optional.length; i++) {
       pcs = pcs.filter(function (x) { return x !== p.optional[i]; });
       list = findVoicings(tuning, pcs, p.bassPc, limit);
     }
-    return list;
+    var byPos = function (a, b) { return posOf(a) - posOf(b); };
+    var dict = isStandard(tuning) ? dictShapes(p) : [];
+    if (!dict.length) {
+      // 자동 계산만: 쉬운 모양부터, 3프렛 안에 붙은 자리는 하나만
+      var only = [], taken = [];
+      list.forEach(function (v) { var k = posOf(v); if (taken.every(function (u) { return Math.abs(u - k) >= 3; })) { taken.push(k); only.push(v); } });
+      return only.sort(byPos);
+    }
+    // 사전 모양을 자리마다 하나씩, 자동 계산은 사전 모양과 3프렛 이상 떨어진 빈 자리만 채움
+    var out = [], used = [];
+    dict.forEach(function (v) { var k = posOf(v); if (used.indexOf(k) < 0) { used.push(k); out.push(v); } });
+    list.forEach(function (v) {
+      var k = posOf(v);
+      if (used.every(function (u) { return Math.abs(u - k) >= 3; })) { used.push(k); out.push(v); }
+    });
+    out.sort(byPos);
+    return out.slice(0, limit);
   }
   // 이름 → 피아노 자리바꿈 목록: 왼손은 C2 옥타브의 베이스(루트 또는 슬래시 베이스),
   // 오른손은 코드음을 G3(55) 이상에서 촘촘히 쌓되 시작음을 바꿔 가며 (기본형, 1전위, 2전위 …)

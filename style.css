@@ -431,3 +431,10 @@ body[data-view="sheet"] .chord-find, body[data-view="sheet"] .pos-nav { display:
   .result .chord-find input, .result .chord-find button { min-height: 40px; }
   .result .pos-nav button { min-height: 40px; min-width: 44px; }
 }
+
+/* 손가락 번호 (사전 모양일 때) */
+.dot { position: relative; }
+.fing {
+  position: absolute; right: -5px; top: -5px; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
+  background: var(--text); color: var(--bg); font-size: 11px; font-style: normal; font-weight: 800; line-height: 17px; text-align: center;
+}

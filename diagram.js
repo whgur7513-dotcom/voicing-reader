@@ -5,7 +5,8 @@
   var BLACK = { 1: 1, 3: 1, 6: 1, 8: 1, 10: 1 };
 
   // frets: 6번줄(저음)부터, -1 = 뮤트
-  function guitar(frets) {
+  // fingers: { g: [줄별 손가락 1~4], b: [바레 프렛] } (없으면 점만)
+  function guitar(frets, fingers) {
     var fretted = frets.filter(function (f) { return f > 0; });
     var max = fretted.length ? Math.max.apply(null, fretted) : 0;
     var min = fretted.length ? Math.min.apply(null, fretted) : 0;
@@ -18,10 +19,21 @@
     for (var r = 0; r <= rows; r++) s.push('<line x1="' + sx(0) + '" y1="' + (top + r * gap) + '" x2="' + sx(5) + '" y2="' + (top + r * gap) + '" stroke="currentColor" stroke-width="1"/>');
     if (start === 1) s.push('<rect x="' + (sx(0) - 0.5) + '" y="' + (top - 3) + '" width="' + (sx(5) - sx(0) + 1) + '" height="4" fill="currentColor"/>');
     else s.push('<text x="' + (sx(0) - 5) + '" y="' + (top + gap / 2 + 4) + '" font-size="10" text-anchor="end" fill="currentColor" font-family="-apple-system,system-ui,sans-serif">' + start + 'fr</text>');
+    // 바레: 같은 프렛에서 그 손가락이 덮는 줄 범위를 막대로
+    (fingers && fingers.b || []).forEach(function (bf) {
+      var idx = frets.map(function (f, i) { return f === bf ? i : -1; }).filter(function (i) { return i >= 0; });
+      if (idx.length < 2 || bf < start || bf >= start + rows) return;
+      var y = top + (bf - start) * gap + gap / 2, x1 = sx(idx[0]), x2 = sx(idx[idx.length - 1]);
+      s.push('<rect x="' + (x1 - 5.6) + '" y="' + (y - 5.6) + '" width="' + (x2 - x1 + 11.2) + '" height="11.2" rx="5.6" fill="currentColor"/>');
+    });
     frets.forEach(function (f, i) {
       if (f < 0) s.push('<text x="' + sx(i) + '" y="' + (top - 8) + '" font-size="11" text-anchor="middle" fill="currentColor" font-family="-apple-system,system-ui,sans-serif">×</text>');
       else if (f === 0) s.push('<circle cx="' + sx(i) + '" cy="' + (top - 12) + '" r="3.6" fill="none" stroke="currentColor" stroke-width="1.3"/>');
-      else s.push('<circle cx="' + sx(i) + '" cy="' + (top + (f - start) * gap + gap / 2) + '" r="5.6" fill="currentColor"/>');
+      else {
+        var cy = top + (f - start) * gap + gap / 2, fn = fingers && fingers.g && fingers.g[i];
+        s.push('<circle cx="' + sx(i) + '" cy="' + cy + '" r="5.6" fill="currentColor"/>');
+        if (fn) s.push('<text x="' + sx(i) + '" y="' + (cy + 3) + '" font-size="8" font-weight="700" text-anchor="middle" fill="#fff" style="fill:var(--card,#fff)" font-family="-apple-system,system-ui,sans-serif">' + fn + '</text>');
+      }
     });
     return { w: w, h: h, svg: wrap(w, h, s.join('')) };
   }

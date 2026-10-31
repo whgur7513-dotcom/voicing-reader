@@ -1,4 +1,4 @@
-// 판별 로직 단위 테스트. 실행: jsc chord.js tests/chord.test.js  (또는 tests/index.html)
+// 판별 로직 단위 테스트. 실행: jsc guitar-shapes.js chord.js tests/chord.test.js  (또는 tests/index.html)
 (function (global) {
   var E = global.ChordEngine;
   var out = typeof print === 'function' ? print : function (s) { console.log(s); };
@@ -123,6 +123,27 @@
   var fInv = E.pianoInversions(E.parseChord('F'));
   check('C 다음 F는 손 이동 적은 C-F-A', nm(fInv[E.nearestInversion(fInv, inv[0])]).indexOf('C4 F4 A4') >= 0,
     nm(fInv[E.nearestInversion(fInv, inv[0])]));
+
+  out('표준 코드 모양 사전');
+  if (typeof GUITAR_SHAPES === 'undefined') { check('사전 불러오기', false, 'guitar-shapes.js 를 함께 실행하세요'); }
+  else {
+    var keys = Object.keys(GUITAR_SHAPES), wrong = [];
+    keys.forEach(function (k) {
+      var part = k.split('|'), root = +part[0], sfx = part[1], bass = +part[2];
+      GUITAR_SHAPES[k].forEach(function (x) {
+        var ms = E.guitarMidis(std, x[0]), r = E.identify(ms);
+        var ok = Math.min.apply(null, ms) % 12 === bass && r.candidates.some(function (c) { return E.parseChord(c.root).rootPc === root && c.suffix === sfx; });
+        if (!ok) wrong.push(k + ' ' + x[0].join(','));
+      });
+    });
+    check('사전의 모든 모양(' + keys.length + '종)이 이름과 일치', wrong.length === 0, wrong.slice(0, 5).join(' / '));
+    var g13 = E.chordVoicings(std, E.parseChord('G13'), 6).map(function (v) { return v.map(function (f) { return f < 0 ? 'x' : f; }).join(''); });
+    check('G13 첫 모양이 사전 모양(손가락 정보 있음)', !!E.chordVoicings(std, E.parseChord('G13'), 6)[0].fingers, g13.join(' '));
+    var am = E.chordVoicings(std, E.parseChord('Am'), 6);
+    check('Am 개방 자리는 x02210, 손가락 정보 포함', am[0].join() === '-1,0,2,2,1,0' && !!am[0].fingers, am.map(function (v) { return v.join(); }).join(' / '));
+    var dd = E.chordVoicings(E.TUNINGS.dropd.midis, E.parseChord('D'), 6);
+    check('Drop D 에서는 자동 계산 (사전 미사용)', dd.length > 0 && !dd[0].fingers, String(dd.length));
+  }
 
   out('\n결과: ' + pass + ' 통과, ' + fail + ' 실패');
   global.__testResult = { pass: pass, fail: fail };
