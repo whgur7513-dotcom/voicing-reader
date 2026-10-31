@@ -296,10 +296,29 @@ button { cursor: pointer; }
   color: var(--accent); font-size: 14px; font-weight: 650; position: relative;
 }
 .info-toggle::after { content: ""; position: absolute; inset: -4px 0; }
-.info { max-height: 18vh; overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: var(--chip); font-size: 14px; line-height: 1.6; }
 .info p { margin: 0 0 6px; }
 .info p:last-child { margin-bottom: 0; }
 .result-name.long { font-size: 25px; padding-top: 10px; }
+
+/* ---------- 세로 화면 (iPhone 17: 402×874 기준) ---------- */
+/* 코드 설명은 아래에서 올라오는 시트로: 고정된 결과 카드가 지판을 가리지 않게 */
+.info {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; max-height: 55vh; overflow-y: auto;
+  padding: 0 max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border-radius: 18px 18px 0 0; border-top: 1px solid var(--line); background: var(--card);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, .25); font-size: 15px; line-height: 1.65;
+}
+.info-head {
+  position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0 8px; background: var(--card); font-size: 16px;
+}
+.info-close { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; }
+.result { padding-bottom: 10px; }
+.result-name { font-size: 42px; }
+.chips { margin-top: 8px; }
+.info-toggle { margin-top: 4px; }
+.dot { width: 38px; height: 38px; font-size: 14px; }
+.g-open .mark { width: 36px; height: 36px; }
 
 /* ---------- 가로 화면 ---------- */
 @media (orientation: landscape) and (min-width: 600px) {
@@ -326,7 +345,11 @@ button { cursor: pointer; }
   .result-actions { order: -1; width: 100%; gap: 6px; }
   .result-actions .icon-btn { flex: 1; height: 40px; border-radius: 12px; }
   .chip { font-size: 14px; padding: 4px 8px; }
-  .info { max-height: none; font-size: 13px; }
+  .info {
+    position: static; max-height: none; padding: 10px 12px; border: 0; border-radius: 12px;
+    background: var(--chip); box-shadow: none; font-size: 13px; line-height: 1.6;
+  }
+  .info-head { display: none; }
   main { min-width: 0; padding-top: 6px; }
   .controls { margin: 8px 0 10px; }
   .hint { display: none; }

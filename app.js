@@ -218,7 +218,8 @@
     $('infoToggle').textContent = state.showInfo ? '코드 설명 접기' : '코드 설명 보기';
     $('infoToggle').setAttribute('aria-expanded', !!state.showInfo);
     $('info').hidden = !paras.length || !state.showInfo;
-    $('info').innerHTML = paras.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
+    $('info').innerHTML = '<div class="info-head"><b>코드 설명</b><button class="info-close" type="button">닫기</button></div>' +
+      paras.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
     $('altsWrap').hidden = !alts.length;
     $('alts').innerHTML = alts.map(function (c) {
       return '<button class="alt" data-name="' + esc(c.name) + '">' + nameHtml(c).replace('class="slash"', '') + '</button>';
@@ -638,6 +639,9 @@
   });
   $('captureBtn').addEventListener('click', capture);
   $('infoToggle').addEventListener('click', function () { state.showInfo = !state.showInfo; save(); renderResult(); });
+  $('info').addEventListener('click', function (e) {
+    if (e.target.closest('.info-close')) { state.showInfo = false; save(); renderResult(); }
+  });
   $('alts').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-name]');
     if (!b) return;
