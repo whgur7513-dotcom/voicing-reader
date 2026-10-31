@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header class="result" id="result" aria-live="polite">
@@ -61,6 +61,16 @@
         <span class="sr-only">튜닝</span>
         <select id="tuning"></select>
       </label>
+      <form class="chord-find" id="chordFind" autocomplete="off">
+        <input id="chordQuery" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false"
+          placeholder="코드 입력 (예: Cmaj7, F#m7b5, G/B)" aria-label="코드 이름">
+        <button type="submit">보기</button>
+      </form>
+      <div class="pos-nav" id="posNav" hidden>
+        <button type="button" id="posPrev" aria-label="이전 포지션">◀</button>
+        <span id="posLabel"></span>
+        <button type="button" id="posNext" aria-label="다음 포지션">▶</button>
+      </div>
     </div>
 
     <section id="guitarView" class="guitar" aria-label="기타 지판"></section>
@@ -119,8 +129,8 @@
     </div>
   </div>
 
-  <script src="chord.js?v=11"></script>
-  <script src="diagram.js?v=11"></script>
-  <script src="app.js?v=11"></script>
+  <script src="chord.js?v=12"></script>
+  <script src="diagram.js?v=12"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

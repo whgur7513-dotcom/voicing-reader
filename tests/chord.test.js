@@ -80,6 +80,36 @@
   check('Cmaj7(b13) 설명에 텐션 안내', d.indexOf('텐션 ♭13') >= 0, d);
   check('음정 설명', E.describe(E.identify([C3, E3])).join('').indexOf('밝은') >= 0, E.describe(E.identify([C3, E3])).join(''));
 
+  out('개방현 코드 키 내리기 (다른 모양 찾기)');
+  function vcheck(desc, frets, n, expect) {
+    var ms = E.guitarMidis(std, frets).map(function (m) { return m + n; });
+    var pcs = []; ms.forEach(function (m) { if (pcs.indexOf(m % 12) < 0) pcs.push(m % 12); });
+    var v = E.findVoicing(std, pcs, Math.min.apply(null, ms) % 12);
+    var got = v ? v.map(function (f) { return f < 0 ? 'x' : f; }).join('') : 'null';
+    var name = v ? E.identify(E.guitarMidis(std, v)).best.name : '-';
+    check(desc + ' → ' + expect, got === expect, got + ' (' + name + ')');
+  }
+  vcheck('C x32010 반음 내림 B', [-1, 3, 2, 0, 1, 0], -1, 'x24442');
+  vcheck('G 320003 반음 내림 F#', [3, 2, 0, 0, 0, 3], -1, '244322');
+  vcheck('A x02220 반음 내림 Ab', [-1, 0, 2, 2, 2, 0], -1, '466544');
+  vcheck('Am x02210 반음 내림 G#m', [-1, 0, 2, 2, 1, 0], -1, '466444');
+  vcheck('D xx0232 반음 내림 Db', [-1, -1, 0, 2, 3, 2], -1, 'x46664');
+
+  out('코드 이름 입력 → 포지션');
+  function pcheck(text, expectName) {
+    var p = E.parseChord(text);
+    if (!p) { check(text + ' 해석', false, 'null'); return; }
+    var v = E.chordVoicings(std, p, 6);
+    var got = v.length ? E.identify(E.guitarMidis(std, v[0])) : null;
+    var names = got ? got.candidates.map(function (c) { return c.name; }) : [];
+    var pn = E.identify(E.pianoVoicing(p)).candidates.map(function (c) { return c.name; });
+    check(text + ' → 기타 ' + (v[0] || []).map(function (f) { return f < 0 ? 'x' : f; }).join('') + ' (' + v.length + '자리), 피아노',
+      names.indexOf(expectName) >= 0 && pn.indexOf(expectName) >= 0, names.slice(0, 3).join('/') + ' | ' + pn.slice(0, 3).join('/'));
+  }
+  pcheck('C', 'C'); pcheck('Am7', 'Am7'); pcheck('Cmaj7', 'Cmaj7'); pcheck('F#m7b5', 'F#m7b5'); pcheck('G/B', 'G/B');
+  pcheck('Bb7(#9)', 'Bb7#9'); pcheck('CΔ7', 'Cmaj7'); pcheck('Dø', 'Dm7b5'); pcheck('E7sus', 'E7sus4'); pcheck('G13', 'G13');
+  check('알 수 없는 이름 → null', E.parseChord('Hello') === null && E.parseChord('Cxyz') === null, 'not null');
+
   out('\n결과: ' + pass + ' 통과, ' + fail + ' 실패');
   global.__testResult = { pass: pass, fail: fail };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

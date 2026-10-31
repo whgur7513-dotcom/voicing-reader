@@ -389,15 +389,31 @@
       !frets.some(function (f, i) { return f >= 0 && out[i] < 0; }) ? out : null;
   }
   // 악보용: n, n±12 중 지판 안에 들어가는 가장 낮은 자리
-  function fitFrets(frets, n) {
-    var c = [n, n + 12, n - 12, n + 24, n - 24].map(function (k) { return shiftFrets(frets, k); }).filter(Boolean);
+  // 같은 코드·같은 베이스를 지판에서 잡기 쉬운 다른 모양으로
+  function revoice(frets, n, tuning) {
+    var ms = E.guitarMidis(tuning, frets).map(function (m) { return m + n; });
+    if (!ms.length) return null;
+    var pcs = [];
+    ms.forEach(function (m) { if (pcs.indexOf(m % 12) < 0) pcs.push(m % 12); });
+    return E.findVoicing(tuning, pcs, Math.min.apply(null, ms) % 12, FRETS);
+  }
+  function fitFrets(frets, n, tuning) {
+    var same = shiftFrets(frets, n);
+    if (same) return same;
+    var v = tuning && revoice(frets, n, tuning);
+    if (v) return v;
+    var c = [n + 12, n - 12, n + 24, n - 24].map(function (k) { return shiftFrets(frets, k); }).filter(Boolean);
     c.sort(function (a, b) { return Math.max.apply(null, a) - Math.max.apply(null, b); });
     return c[0] || frets;
   }
   function shiftCurrent(n) {
     if (state.mode === 'guitar') {
       var out = shiftFrets(state.guitar, n);
-      if (!out) { toast(n < 0 ? '개방현이 있어 더 내릴 수 없어요' : '15프렛을 넘어가요'); return; }
+      if (!out) {
+        out = revoice(state.guitar, n, tuningMidis());
+        if (!out) { toast('잡을 수 있는 모양을 찾지 못했어요'); return; }
+        toast(n < 0 && state.guitar.indexOf(0) >= 0 ? '개방현이라 다른 모양으로 바꿨어요' : '다른 모양으로 바꿨어요');
+      }
       state.guitar = out;
     } else {
       var ms = state.piano.map(function (m) { return m + n; });
@@ -421,7 +437,7 @@
     var n = shiftOf(it);
     if (!n) return it;
     return { id: it.id, kind: it.kind, tuning: it.tuning, name: transposeName(it.name, n),
-      frets: it.kind === 'guitar' ? fitFrets(it.frets, n) : it.frets,
+      frets: it.kind === 'guitar' ? fitFrets(it.frets, n, E.TUNINGS[it.tuning].midis) : it.frets,
       midis: it.midis.map(function (m) { return m + n; }) };
   }
   function nameOf(it) { return tv(it).name; }
@@ -707,6 +723,54 @@
   on('tUp', 'click', function () { setTranspose((state.sheet.transpose || 0) + 1); });
   on('tReset', 'click', function () { setTranspose(0); });
 
+  // ---------- 코드 이름으로 찾기 ----------
+  var found = null; // { name, list, idx } 기타 포지션 목록
+  function showFound() {
+    var nav = $('posNav');
+    if (!nav) return;
+    var on = found && state.mode === 'guitar' && !state.sheetOpen && found.list.length > 0;
+    nav.hidden = !on;
+    if (!on) return;
+    var fr = found.list[found.idx].filter(function (f) { return f > 0; });
+    var pos = fr.length ? Math.min.apply(null, fr) : 0;
+    $('posLabel').textContent = '포지션 ' + (found.idx + 1) + '/' + found.list.length + (pos > 3 ? ' · ' + pos + '프렛' : ' · 개방');
+  }
+  function applyFound() {
+    state.guitar = found.list[found.idx].slice();
+    found.keep = true; // 이번 변경으로는 목록을 닫지 않음
+    changed();
+    pickName(found.p);
+    playAll();
+  }
+  // 입력한 이름과 같은 해석이 후보에 있으면 그 이름으로 보여 줌 (예: C6 ↔ Am7/C)
+  function pickName(p) {
+    if (!result || result.type !== 'chord') return;
+    var hit = result.candidates.filter(function (c) {
+      return c.suffix === p.suffix && E.parseChord(c.root).rootPc === p.rootPc &&
+        (c.bass ? E.parseChord(c.bass).rootPc : p.rootPc) === p.bassPc;
+    })[0];
+    if (hit) { pick = hit.name; analyze(); render(); }
+  }
+  on('chordFind', 'submit', function (e) {
+    e.preventDefault();
+    var q = $('chordQuery').value, p = E.parseChord(q);
+    if (!p) { toast('코드 이름을 알아보지 못했어요'); return; }
+    $('chordQuery').blur();
+    ensureAudio();
+    if (state.mode === 'piano') {
+      state.piano = E.pianoVoicing(p);
+      found = null;
+      changed(); pickName(p); playAll();
+      return;
+    }
+    var list = E.chordVoicings(tuningMidis(), p, 6);
+    if (!list.length) { toast('이 튜닝에서 잡을 수 있는 모양을 찾지 못했어요'); return; }
+    found = { p: p, list: list, idx: 0 };
+    applyFound();
+  });
+  on('posPrev', 'click', function () { if (!found) return; found.idx = (found.idx + found.list.length - 1) % found.list.length; applyFound(); });
+  on('posNext', 'click', function () { if (!found) return; found.idx = (found.idx + 1) % found.list.length; applyFound(); });
+
   // ---------- 공통 ----------
   function render() {
     var sh = state.sheetOpen, g = !sh && state.mode === 'guitar', p = !sh && state.mode === 'piano';
@@ -732,7 +796,12 @@
     renderResult();
     if (g) renderGuitar(); else renderPiano();
   }
-  function changed() { pick = null; analyze(); save(); render(); }
+  function changed() {
+    pick = null; analyze(); save(); render();
+    if (found && !found.keep) found = null;
+    if (found) found.keep = false;
+    showFound();
+  }
   LAND.addEventListener('change', render);
 
   $('tuning').innerHTML = Object.keys(E.TUNINGS).map(function (k) {

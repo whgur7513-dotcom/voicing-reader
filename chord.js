@@ -305,6 +305,147 @@
     return out;
   }
 
+  // 기타에서 같은 코드(구성음 pcs, 베이스 bassPc)를 잡기 쉬운 모양으로 찾기.
+  // 4프렛 폭 안에서 손가락 4개(바레는 1개로) 이하, 베이스가 맞는 것 중 낮은 자리·개방현 많은 쪽 우선
+  function searchVoicings(tuning, pcs, bassPc, maxFret) {
+    maxFret = maxFret || 15;
+    var want = {}, all = [], seen = {}, cur = [];
+    pcs.forEach(function (p) { want[mod12(p)] = 1; });
+    var need = Math.max(3, Math.min(pcs.length, 4));
+    function evaluate(fr) {
+      var idx = [], i;
+      for (i = 0; i < 6; i++) if (fr[i] >= 0) idx.push(i);
+      if (idx.length < need) return;
+      var have = {}, low = Infinity;
+      idx.forEach(function (j) { var m = tuning[j] + fr[j]; have[mod12(m)] = 1; if (m < low) low = m; });
+      if (pcs.some(function (p) { return !have[mod12(p)]; })) return;
+      if (bassPc !== null && mod12(low) !== mod12(bassPc)) return;
+      var fretted = idx.filter(function (j) { return fr[j] > 0; });
+      var fv = fretted.map(function (j) { return fr[j]; });
+      var minF = fv.length ? Math.min.apply(null, fv) : 0, maxF = fv.length ? Math.max.apply(null, fv) : 0;
+      if (maxF - minF > 3) return;
+      var atMin = fretted.filter(function (j) { return fr[j] === minF; });
+      var fingers = fv.length - (atMin.length >= 2 ? atMin.length - 1 : 0);
+      if (fingers > 4) return;
+      // 바레를 쓰면 바레 첫 줄보다 높은 줄은 개방현일 수 없음
+      if (fv.length > 4 && idx.some(function (j) { return fr[j] === 0 && j > atMin[0]; })) return;
+      var inner = 0;
+      for (i = idx[0]; i <= idx[idx.length - 1]; i++) if (fr[i] < 0) inner++;
+      var opens = idx.filter(function (j) { return fr[j] === 0; }).length;
+      // 넓게 벌리는 모양보다 표준 바레 모양이 이기도록 폭(span)에 무게
+      // 개방현은 낮은 자리(4프렛 이내)에서만. 높은 자리는 옮겨 쓸 수 있는 막힌 모양으로
+      if (opens && maxF > 4) return;
+      var score = maxF * 0.6 + (maxF - minF) * 1.3 + (6 - idx.length) * 1.2 + inner * 6 - opens * 0.4 + fingers * 0.5;
+      var key = fr.join(',');
+      if (!seen[key]) { seen[key] = 1; all.push({ frets: fr.slice(), score: score, minF: fv.length ? minF : 0 }); }
+    }
+    for (var pos = 0; pos <= maxFret - 3; pos++) {
+      var lo = Math.max(1, pos), hi = Math.min(maxFret, pos === 0 ? 3 : pos + 3);
+      var opts = tuning.map(function (open) {
+        var o = [-1];
+        if (want[mod12(open)]) o.push(0);
+        for (var f = lo; f <= hi; f++) if (want[mod12(open + f)]) o.push(f);
+        return o;
+      });
+      (function rec(i) {
+        if (i === 6) { evaluate(cur); return; }
+        for (var k = 0; k < opts[i].length; k++) { cur[i] = opts[i][k]; rec(i + 1); }
+      })(0);
+    }
+    return all;
+  }
+  function findVoicing(tuning, pcs, bassPc, maxFret) {
+    var all = searchVoicings(tuning, pcs, bassPc, maxFret);
+    if (!all.length && bassPc !== null) all = searchVoicings(tuning, pcs, null, maxFret);
+    if (!all.length) return null;
+    all.sort(function (a, b) { return a.score - b.score; });
+    return all[0].frets;
+  }
+  // 지판 위 여러 자리(포지션)의 모양: 자리마다 가장 쉬운 것 하나, 낮은 자리부터
+  function findVoicings(tuning, pcs, bassPc, limit) {
+    var all = searchVoicings(tuning, pcs, bassPc);
+    if (!all.length && bassPc !== null) all = searchVoicings(tuning, pcs, null);
+    all.sort(function (a, b) { return a.score - b.score; });
+    var byPos = {}, out = [];
+    all.forEach(function (v) {
+      var p = v.minF <= 3 ? 0 : v.minF; // 개방 자리(1~3프렛)는 하나로
+      if (byPos[p] === undefined) { byPos[p] = out.length; out.push(v); }
+    });
+    out.sort(function (a, b) { return a.minF - b.minF; });
+    return out.slice(0, limit || 6).map(function (v) { return v.frets; });
+  }
+
+  // 코드 이름 해석: "Cmaj7", "F#m7b5", "G/B", "Bb7(#9)", "CΔ7", "Dø" … → 구성음
+  var ALIASES = [
+    [/^(maj|M|Δ)$/, ''], [/^(min|mi|-)$/, 'm'], [/^(M7|Maj7|ma7|Δ7|j7)$/, 'maj7'], [/^(M9|Maj9|Δ9)$/, 'maj9'],
+    [/^(m7-5|m7\(b5\)|ø|ø7|-7b5|min7b5)$/, 'm7b5'], [/^(°|o)$/, 'dim'], [/^(°7|o7)$/, 'dim7'], [/^(\+|\+5|#5)$/, 'aug'],
+    [/^sus$/, 'sus4'], [/^7sus$/, '7sus4'], [/^add2$/, 'add9'], [/^(69|6add9)$/, '6/9'], [/^(m69|m6add9)$/, 'm6/9'],
+    [/^(mM7|mmaj7|m\(maj7\)|-maj7|minmaj7)$/, 'mMaj7'], [/^(min7|mi7|-7)$/, 'm7'], [/^(min9|-9)$/, 'm9'], [/^(min6|-6)$/, 'm6'],
+    [/^(7-5|7\(b5\))$/, '7b5'], [/^(7\+5|\+7|aug7|7\(#5\))$/, '7#5'], [/^(7-9|7\(b9\))$/, '7b9'], [/^(7\+9|7\(#9\))$/, '7#9'],
+    [/^(5|no3)$/, '5'], [/^(dim5)$/, 'dim'], [/^alt$/, '7#5#9'], [/^(maj7\(#11\)|Δ#11)$/, 'maj7#11'], [/^(m\(add9\))$/, 'madd9']
+  ];
+  function parseChord(text) {
+    var t = String(text || '').trim().replace(/♯/g, '#').replace(/♭/g, 'b').replace(/\s+/g, '');
+    var m = /^([A-Ga-g])(#|b)?(.*)$/.exec(t);
+    if (!m) return null;
+    var letter = m[1].toUpperCase(), rest = m[3], bassPc = null;
+    var rootPc = mod12(LETTER_PC[LETTERS.indexOf(letter)] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0));
+    var sl = /\/([A-Ga-g])(#|b)?$/.exec(rest);
+    if (sl) {
+      bassPc = mod12(LETTER_PC[LETTERS.indexOf(sl[1].toUpperCase())] + (sl[2] === '#' ? 1 : sl[2] === 'b' ? -1 : 0));
+      rest = rest.slice(0, sl.index);
+    }
+    var suffix = rest;
+    ALIASES.forEach(function (a) { if (a[0].test(suffix)) suffix = a[1]; });
+    var tpl = TEMPLATES.filter(function (x) { return x.suffix === suffix && !x.variant; })[0], tens = [];
+    if (!tpl) { // 기본 코드(텐션) 꼴: Cmaj7(b13), C7(9,13)
+      var tm = /^(.*?)\(([^)]*)\)$/.exec(suffix);
+      if (!tm) return null;
+      var base = tm[1];
+      ALIASES.forEach(function (a) { if (a[0].test(base)) base = a[1]; });
+      tpl = TEMPLATES.filter(function (x) { return x.suffix === base && !x.variant; })[0];
+      if (!tpl) return null;
+      var bad = false;
+      tens = tm[2].split(/[,\s]+/).filter(Boolean).map(function (l) {
+        l = l.replace(/^add/, '');
+        if (!/^(bb|b|#)?(2|4|6|9|11|13)$/.test(l)) { bad = true; return null; }
+        return parseDeg(l.replace(/^(b|#)?2$/, '$19').replace(/^(b|#)?4$/, '$111').replace(/^(b|#)?6$/, '$113'));
+      });
+      if (bad) return null;
+    }
+    var degs = tpl.degs.concat(tens);
+    var pcs = [];
+    degs.forEach(function (d) { var p = mod12(rootPc + d.semi); if (pcs.indexOf(p) < 0) pcs.push(p); });
+    if (bassPc !== null && pcs.indexOf(bassPc) < 0) pcs.push(bassPc); // 코드 밖 베이스(C/D 등)
+    // 기타에서 잡기 어려우면 뺄 수 있는 음 (5도 → 11도 → 9도 순)
+    var optional = ['5', '11', '9'].map(function (l) {
+      var d = degs.filter(function (x) { return x.label === l; })[0];
+      return d ? mod12(rootPc + d.semi) : null;
+    }).filter(function (p) { return p !== null && p !== bassPc; });
+    var name = ROOT_NAMES[rootPc] + tpl.suffix + (tens.length ? '(' + tens.map(function (d) { return d.label; }).join(',') + ')' : '') +
+      (bassPc !== null && bassPc !== rootPc ? '/' + ROOT_NAMES[bassPc] : '');
+    return { rootPc: rootPc, bassPc: bassPc === null ? rootPc : bassPc, suffix: tpl.suffix, pcs: pcs, optional: optional, name: name };
+  }
+  // 이름 → 기타 포지션 목록 (다 못 잡으면 5도·11도·9도를 차례로 빼고 다시)
+  function chordVoicings(tuning, p, limit) {
+    var pcs = p.pcs.slice(), list = findVoicings(tuning, pcs, p.bassPc, limit);
+    for (var i = 0; !list.length && i < p.optional.length; i++) {
+      pcs = pcs.filter(function (x) { return x !== p.optional[i]; });
+      list = findVoicings(tuning, pcs, p.bassPc, limit);
+    }
+    return list;
+  }
+  // 이름 → 피아노 보이싱: 베이스는 C3 옥타브, 나머지는 그 위로 차례로
+  function pianoVoicing(p) {
+    var bass = 48 + p.bassPc, out = [bass], last = bass;
+    var rest = p.pcs.filter(function (x) { return x !== p.bassPc; })
+      .sort(function (a, b) { return mod12(a - p.rootPc) - mod12(b - p.rootPc); });
+    // 루트를 베이스로 쓰지 않았다면 루트부터 위로 쌓기
+    if (p.bassPc !== p.rootPc) { var r = 48 + p.rootPc; while (r <= last) r += 12; out.push(r); last = r; rest = rest.filter(function (x) { return x !== p.rootPc; }); }
+    rest.forEach(function (pc) { var m = 48 + pc; while (m <= last) m += 12; out.push(m); last = m; });
+    return out;
+  }
+
   // frets: 6번줄(저음)부터, -1 = 뮤트
   function guitarMidis(tuningMidis, frets) {
     var out = [];
@@ -314,6 +455,7 @@
 
   global.ChordEngine = {
     ROOT_NAMES: ROOT_NAMES, TUNINGS: TUNINGS, TEMPLATES: TEMPLATES,
-    identify: identify, describe: describe, DESC: DESC, prettyDeg: prettyDeg, guitarMidis: guitarMidis, pretty: pretty, spell: spell
+    identify: identify, findVoicing: findVoicing, findVoicings: findVoicings, parseChord: parseChord,
+    chordVoicings: chordVoicings, pianoVoicing: pianoVoicing, describe: describe, DESC: DESC, prettyDeg: prettyDeg, guitarMidis: guitarMidis, pretty: pretty, spell: spell
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
