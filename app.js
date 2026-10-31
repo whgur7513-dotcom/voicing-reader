@@ -551,6 +551,10 @@
     $('modePiano').setAttribute('aria-selected', p);
     $('modeSheet').setAttribute('aria-selected', sh);
     $('result').hidden = sh;
+    // 가로 화면에서는 악기·튜닝 선택을 왼쪽 패널로 옮겨 지판 높이를 확보
+    var controls = document.querySelector('.controls'), main = document.querySelector('main');
+    if (LAND.matches && !sh) { if (controls.parentNode !== $('result')) $('result').insertBefore(controls, $('result').firstChild); }
+    else if (controls.parentNode !== main) main.insertBefore(controls, main.firstChild);
     $('guitarView').hidden = !g;
     $('pianoView').hidden = !p;
     $('sheetView').hidden = !sh;

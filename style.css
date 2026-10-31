@@ -296,7 +296,7 @@ button { cursor: pointer; }
   color: var(--accent); font-size: 14px; font-weight: 650; position: relative;
 }
 .info-toggle::after { content: ""; position: absolute; inset: -4px 0; }
-.info { max-height: 28vh; overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: var(--chip); font-size: 14px; line-height: 1.6; }
+.info { max-height: 18vh; overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: var(--chip); font-size: 14px; line-height: 1.6; }
 .info p { margin: 0 0 6px; }
 .info p:last-child { margin-bottom: 0; }
 .result-name.long { font-size: 25px; padding-top: 10px; }
@@ -304,41 +304,55 @@ button { cursor: pointer; }
 /* ---------- 가로 화면 ---------- */
 @media (orientation: landscape) and (min-width: 600px) {
   body {
-    display: grid; grid-template-columns: minmax(250px, 32%) 1fr; gap: 14px; align-items: start;
-    padding-top: env(safe-area-inset-top);
+    --land-h: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: 216px 1fr; gap: 12px; align-items: start;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
   }
   body:has(.result[hidden]) { grid-template-columns: 1fr; }
   .result {
-    top: 8px; margin: 8px 0; border-radius: 16px; border: 1px solid var(--line);
-    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto;
-    padding: 12px 14px;
+    top: 6px; margin: 6px 0; border-radius: 16px; border: 1px solid var(--line);
+    max-height: calc(var(--land-h) - 12px); overflow-y: auto; padding: 10px 12px;
   }
-  .result-name { font-size: 38px; }
-  .result-name.mid { font-size: 28px; }
-  .result-name.long { font-size: 22px; }
-  .result-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 104px; }
-  .info { max-height: none; }
-  main { min-width: 0; }
+  .result .controls { flex-wrap: wrap; margin: 0 0 10px; gap: 6px; }
+  .result .segmented { flex: 1 1 100%; }
+  .result .segmented button { min-height: 40px; font-size: 14px; }
+  .result .tuning { flex: 1 1 100%; }
+  .result .tuning select { width: 100%; max-width: none; min-height: 40px; }
+  .result-name { font-size: 32px; }
+  .result-name.mid { font-size: 25px; }
+  .result-name.long { font-size: 20px; }
+  .result-top { flex-direction: column; gap: 6px; }
+  .result-name-wrap { width: 100%; }
+  .result-actions { order: -1; width: 100%; gap: 6px; }
+  .result-actions .icon-btn { flex: 1; height: 40px; border-radius: 12px; }
+  .chip { font-size: 14px; padding: 4px 8px; }
+  .info { max-height: none; font-size: 13px; }
+  main { min-width: 0; padding-top: 6px; }
   .controls { margin: 8px 0 10px; }
-  .hint { margin-top: 8px; }
+  .hint { display: none; }
 
-  /* 가로 지판: 위 1번줄 ~ 아래 6번줄, 왼쪽 헤드 */
+  /* 가로 지판: 위 1번줄 ~ 아래 6번줄, 왼쪽 헤드. 줄 높이는 화면 높이에 맞춤 */
   .guitar.h {
-    grid-template-columns: 24px 46px repeat(15, minmax(42px, 1fr));
-    max-width: none; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 2px;
+    --row: clamp(44px, calc((var(--land-h) - 52px) / 6), 72px);
+    grid-template-columns: 22px 56px repeat(15, minmax(64px, 1fr));
+    max-width: none; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 10px;
   }
-  .guitar.h .g-cell { height: 44px; }
-  .guitar.h .g-head { height: 44px; display: grid; place-items: center; }
-  .guitar.h .g-num { height: 20px; }
+  .guitar.h .g-cell, .guitar.h .g-head { height: var(--row); }
+  .guitar.h .g-head { display: grid; place-items: center; font-size: 13px; }
+  .guitar.h .g-num { height: 22px; font-size: 13px; }
   .guitar.h .g-fret { border-bottom: 0; border-right: 2px solid var(--fret); }
-  .guitar.h .g-fret.first { border-top: 0; border-left: 6px solid var(--nut); }
+  .guitar.h .g-fret.first { border-top: 0; border-left: 7px solid var(--nut); }
   .guitar.h .g-fret::before {
     top: 50%; bottom: auto; left: 0; right: -2px; width: auto; height: var(--sw, 1.5px); transform: translateY(-50%);
   }
-  .guitar.h .g-inlay { left: 50%; margin-left: -7px; }
+  .guitar.h .g-inlay { left: 50%; margin-left: -8px; width: 16px; height: 16px; }
+  .guitar.h .dot { width: min(42px, calc(var(--row) - 8px)); height: min(42px, calc(var(--row) - 8px)); font-size: 15px; }
+  .guitar.h .g-open .mark { width: min(40px, calc(var(--row) - 8px)); height: min(40px, calc(var(--row) - 8px)); }
+  .guitar.h .g-open { font-size: 22px; }
 
-  .piano { max-width: none; gap: 10px; }
-  .keys { height: 112px; }
+  .piano { max-width: none; gap: 8px; }
+  .octave-label { margin-bottom: 2px; }
+  .keys { height: calc((var(--land-h) - 64px) / 2); min-height: 100px; }
   .sheet { max-width: none; }
   .sheet-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
