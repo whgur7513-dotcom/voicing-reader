@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>보이싱 판독기</title>
+  <meta name="description" content="기타 지판이나 피아노 건반에서 찍은 보이싱의 코드 이름을 알려줍니다.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="보이싱">
+  <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16171b" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="result" id="result" aria-live="polite">
+    <div class="result-top">
+      <div class="result-name-wrap">
+        <div class="result-name" id="chordName">–</div>
+        <div class="result-sub" id="chordSub"></div>
+      </div>
+      <div class="result-actions">
+        <button class="icon-btn" id="captureBtn" aria-label="악보에 담기">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn" id="playBtn" aria-label="재생">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>
+        </button>
+        <button class="icon-btn" id="clearBtn" aria-label="지우기">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="chips" id="tones"></div>
+    <button class="info-toggle" id="infoToggle" aria-expanded="false" aria-controls="info">코드 설명 보기</button>
+    <div class="info" id="info" hidden></div>
+    <div class="alts" id="altsWrap" hidden>
+      <span class="alts-label">다른 이름</span>
+      <div class="chips" id="alts"></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="controls">
+      <div class="segmented" role="tablist" aria-label="악기">
+        <button role="tab" data-mode="guitar" id="modeGuitar">기타</button>
+        <button role="tab" data-mode="piano" id="modePiano">피아노</button>
+        <button role="tab" data-mode="sheet" id="modeSheet">악보</button>
+      </div>
+      <label class="tuning" id="tuningWrap">
+        <span class="sr-only">튜닝</span>
+        <select id="tuning"></select>
+      </label>
+    </div>
+
+    <section id="guitarView" class="guitar" aria-label="기타 지판"></section>
+    <section id="pianoView" class="piano" aria-label="피아노 건반" hidden></section>
+    <section id="sheetView" class="sheet" aria-label="코드 악보" hidden>
+      <input id="sheetTitle" class="sheet-title" type="text" placeholder="제목 없는 코드 악보" aria-label="악보 제목" autocomplete="off">
+      <div class="sheet-tools" id="sheetTools">
+        <button id="sheetPdf">PDF로 저장</button>
+        <button id="sheetImgBtn">이미지로 저장</button>
+        <button id="sheetClear" class="danger">모두 지우기</button>
+      </div>
+      <div class="sheet-grid" id="sheetGrid"></div>
+      <div class="lyrics-head">
+        <h2>가사</h2>
+        <label class="lyrics-opt"><input type="checkbox" id="lyricsDiag"> 다이어그램</label>
+        <button id="lyricsToggle">가사 입력</button>
+      </div>
+      <div id="lyricsEdit" hidden>
+        <textarea id="lyricsText" rows="8" placeholder="가사를 한 줄씩 입력하세요" aria-label="가사"></textarea>
+      </div>
+      <div class="lyrics" id="lyricsView"></div>
+    </section>
+    <p class="hint" id="hint"></p>
+  </main>
+
+  <div class="sheet-bar" id="sheetBar" hidden>
+    <button data-act="left" aria-label="앞으로">◀</button>
+    <button data-act="right" aria-label="뒤로">▶</button>
+    <button data-act="load">불러오기</button>
+    <button data-act="delete" class="danger">삭제</button>
+  </div>
+  <div class="chord-picker" id="chordPicker" hidden>
+    <div class="picker-top">
+      <span id="pickerTitle"></span>
+      <button id="pickerRemove" class="danger">코드 빼기</button>
+      <button id="pickerClose">닫기</button>
+    </div>
+    <div class="picker-chips" id="pickerChips"></div>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <div class="overlay" id="imgOverlay" hidden>
+    <div class="overlay-box">
+      <img id="sheetImg" alt="코드 악보 이미지">
+      <p>이미지를 길게 눌러 ‘사진에 저장’하거나 공유 버튼을 누르세요.</p>
+      <div class="overlay-actions">
+        <button id="shareImg" class="primary">공유 / 저장</button>
+        <button id="closeImg">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="chord.js"></script>
+  <script src="diagram.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
