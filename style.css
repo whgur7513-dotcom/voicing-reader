@@ -426,7 +426,7 @@ button { cursor: pointer; }
 .pos-nav { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; }
 .pos-nav button { min-width: 52px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 16px; }
 .pos-nav span { flex: 1; text-align: center; font-weight: 700; color: var(--accent); font-size: 14px; }
-body[data-view="sheet"] .chord-find, body[data-view="sheet"] .pos-nav { display: none; }
+body[data-view="sheet"] .controls .chord-find, body[data-view="sheet"] .controls .pos-nav { display: none; }
 @media (orientation: landscape) and (min-width: 600px) {
   .result .chord-find input, .result .chord-find button { min-height: 40px; }
   .result .pos-nav button { min-height: 40px; min-width: 44px; }
@@ -438,3 +438,36 @@ body[data-view="sheet"] .chord-find, body[data-view="sheet"] .pos-nav { display:
   position: absolute; right: -5px; top: -5px; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
   background: var(--text); color: var(--bg); font-size: 11px; font-style: normal; font-weight: 800; line-height: 17px; text-align: center;
 }
+
+/* 악보: 코드 추가 칸 */
+.add-card { justify-content: center; border-style: dashed; color: var(--accent); font-weight: 700; gap: 4px; }
+.add-card b { font-size: 30px; line-height: 1; }
+.new-chip { color: var(--accent); justify-content: center; border-style: dashed; }
+.new-chip b { font-size: 22px; line-height: 1; }
+@media print { .add-card { display: none !important; } }
+
+/* 코드 추가·수정 창 */
+.ed-box { max-width: 420px; display: flex; flex-direction: column; gap: 10px; }
+.ed-head { display: flex; align-items: center; justify-content: space-between; font-size: 17px; }
+.ed-head button { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; }
+.ed-box .chord-find, .ed-box .pos-nav { flex: none; }
+.ed-kind button { min-height: 40px; }
+.ed-grid { display: grid; grid-template-columns: 30px repeat(6, 1fr); width: 100%; max-width: 320px; margin: 0 auto; }
+.ed-open { height: 36px; border: 0; background: none; font-size: 18px; font-weight: 700; color: var(--muted); }
+.ed-num { display: grid; place-items: center; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ed-cell { position: relative; height: 44px; border: 0; padding: 0; background: var(--wood); border-bottom: 2px solid var(--fret); display: grid; place-items: center; }
+.ed-cell.first { border-top: 5px solid var(--nut); }
+.ed-cell::before { content: ""; position: absolute; top: 0; bottom: -2px; left: 50%; width: 1.5px; transform: translateX(-50%); background: var(--string); }
+.ed-dot {
+  position: relative; z-index: 1; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
+  display: grid; place-items: center; font-size: 13px; font-weight: 800;
+}
+.ed-start { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.ed-start button { min-width: 52px; min-height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.ed-start button:disabled { opacity: .35; }
+.ed-start span { font-size: 13px; color: var(--muted); min-width: 110px; text-align: center; }
+.ed-piano { color: var(--text); padding: 4px 0; }
+.ed-piano svg { display: block; width: 100%; height: auto; max-height: 120px; }
+.ed-name { text-align: center; font-size: 28px; font-weight: 800; min-height: 36px; }
+.ed-name span { font-size: 14px; font-weight: 500; color: var(--muted); }
+.overlay-actions button:disabled { opacity: .4; }

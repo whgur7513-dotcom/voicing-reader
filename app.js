@@ -485,12 +485,13 @@
     var items = state.sheet.items;
     if (document.activeElement !== $('sheetTitle')) $('sheetTitle').value = state.sheet.title;
     if (sel >= items.length) sel = -1;
-    $('sheetGrid').innerHTML = items.length ? items.map(function (it, i) {
+    $('sheetGrid').innerHTML = items.map(function (it, i) {
       var tuning = it.kind === 'guitar' && it.tuning !== 'standard' ? '<span class="sc-tuning">' + esc(E.TUNINGS[it.tuning].label) + '</span>' : '';
       return '<button class="sheet-card' + (i === sel ? ' sel' : '') + '" data-i="' + i + '">' +
         '<span class="sc-num">' + (i + 1) + '</span><span class="sc-name' + (nameOf(it).length > 7 ? ' long' : '') + '">' + esc(E.pretty(nameOf(it))) + '</span>' +
         '<span class="sc-diagram ' + it.kind + '">' + diagram(it).svg + '</span>' + tuning + '</button>';
-    }).join('') : '<p class="sheet-empty">기타·피아노 화면에서 결과 카드의 ＋ 버튼을 누르면<br>코드가 여기에 차례로 담겨요.</p>';
+    }).join('') + '<button class="sheet-card add-card" data-add="1"><b>＋</b><span>코드 추가</span></button>' +
+      (items.length ? '' : '<p class="sheet-empty">＋ 코드 추가로 이름을 입력하거나 직접 그려서 넣을 수 있어요.<br>기타·피아노 화면의 ＋ 버튼으로 담아도 돼요.</p>');
     $('sheetBar').hidden = sel < 0;
     $('sheetPdf').disabled = $('sheetImgBtn').disabled = $('sheetClear').disabled = !hasContent();
     var t = state.sheet.transpose || 0;
@@ -534,13 +535,14 @@
       var k = nameOf(it) + '|' + diagram(it).svg;
       if (seen[k]) return false; seen[k] = 1; return true;
     });
-    $('pickerChips').innerHTML = uniq.length ? uniq.map(function (it) {
+    $('pickerChips').innerHTML = '<button class="pick-chip new-chip" data-new="1"><b>＋</b>새 코드</button>' + uniq.map(function (it) {
       return '<button class="pick-chip" data-id="' + it.id + '"><span class="pc-diag ' + it.kind + '">' + diagram(it).svg + '</span>' + esc(E.pretty(nameOf(it))) + '</button>';
-    }).join('') : '<p class="picker-empty">담은 코드가 없어요. 기타·피아노 화면에서 ＋ 버튼으로 먼저 담아 주세요.</p>';
+    }).join('');
     $('pickerRemove').hidden = !markAt(pickPos.l, pickPos.c);
   }
 
   $('sheetGrid').addEventListener('click', function (e) {
+    if (e.target.closest('[data-add]')) { sel = -1; pickPos = null; renderSheet(); openEditor({}); return; }
     var b = e.target.closest('button[data-i]');
     if (!b) return;
     sel = sel === +b.dataset.i ? -1 : +b.dataset.i;
@@ -553,6 +555,7 @@
     var items = state.sheet.items, act = b.dataset.act;
     if (act === 'left' && sel > 0) { items.splice(sel - 1, 0, items.splice(sel, 1)[0]); sel--; }
     else if (act === 'right' && sel < items.length - 1) { items.splice(sel + 1, 0, items.splice(sel, 1)[0]); sel++; }
+    else if (act === 'edit') { openEditor({ item: items[sel] }); return; }
     else if (act === 'delete') {
       var gone = items.splice(sel, 1)[0];
       state.sheet.marks = state.sheet.marks.filter(function (m) { return m.id !== gone.id; });
@@ -600,6 +603,7 @@
     renderSheet();
   });
   $('pickerChips').addEventListener('click', function (e) {
+    if (e.target.closest('[data-new]')) { var place = pickPos; pickPos = null; renderSheet(); openEditor({ place: place }); return; }
     var b = e.target.closest('button[data-id]');
     if (!b || !pickPos) return;
     var p = pickPos;
@@ -736,6 +740,188 @@
   on('tUp', 'click', function () { setTranspose((state.sheet.transpose || 0) + 1); });
   on('tReset', 'click', function () { setTranspose(0); });
 
+  // 개방현을 쓰거나 1~3프렛 안이면 '개방', 아니면 가장 낮은 프렛
+  function posText(frets) {
+    var fv = frets.filter(function (f) { return f > 0; });
+    if (!fv.length || frets.indexOf(0) >= 0 || Math.max.apply(null, fv) <= 3) return '개방';
+    return Math.min.apply(null, fv) + '프렛';
+  }
+  // ---------- 악보에서 직접 코드 추가·수정 (이름 입력 / 작은 코드표에 그리기) ----------
+  var ed = null;
+  function autoStart(fr) {
+    var fv = fr.filter(function (f) { return f > 0; });
+    if (!fv.length) return 1;
+    var mx = Math.max.apply(null, fv), mn = Math.min.apply(null, fv);
+    return mx <= 5 ? 1 : Math.min(mn, FRETS - 4);
+  }
+  function openEditor(opt) {
+    var base = opt.item ? tv(opt.item) : null;
+    ed = { item: opt.item || null, place: opt.place || null,
+      kind: base ? base.kind : state.mode, tuning: base && base.tuning ? base.tuning : state.tuning,
+      frets: base && base.kind === 'guitar' ? base.frets.slice() : [-1, -1, -1, -1, -1, -1],
+      fingers: base && base.fingers ? { g: base.fingers.g.slice(), b: base.fingers.b.slice() } : null,
+      midis: base && base.kind === 'piano' ? base.midis.slice() : [], p: null, list: null, li: 0, query: base ? nameOf(opt.item) : '' };
+    ed.start = autoStart(ed.frets);
+    $('chordEditor').hidden = false;
+    renderEditor();
+  }
+  function closeEditor() { ed = null; $('chordEditor').hidden = true; }
+  function edMidis() {
+    return ed.kind === 'guitar' ? E.guitarMidis(E.TUNINGS[ed.tuning].midis, ed.frets) : ed.midis.slice();
+  }
+  function edName() {
+    var ms = edMidis();
+    if (!ms.length) return null;
+    var r = E.identify(ms);
+    if (r.type !== 'chord') return r.type === 'single' ? r.tones[0].name : r.tones.map(function (t) { return t.name; }).join(' ');
+    if (ed.p) {
+      var p = ed.p, hit = r.candidates.filter(function (c) {
+        return c.suffix === p.suffix && E.parseChord(c.root).rootPc === p.rootPc && (c.bass ? E.parseChord(c.bass).rootPc : p.rootPc) === p.bassPc;
+      })[0];
+      if (hit) return hit.name;
+    }
+    return r.best.name;
+  }
+  function edApply() {
+    var v = ed.list[ed.li];
+    if (ed.kind === 'guitar') { ed.frets = v.slice(); ed.fingers = fingersOf(v); ed.start = autoStart(ed.frets); }
+    else ed.midis = v.slice();
+  }
+  function edBuild() {
+    if (!ed.p) { ed.list = null; return; }
+    if (ed.kind === 'guitar') {
+      ed.list = E.chordVoicings(E.TUNINGS[ed.tuning].midis, ed.p, 6);
+      ed.li = 0;
+    } else {
+      ed.list = E.pianoInversions(ed.p);
+      if (!ed.list.length) ed.list = [E.pianoVoicing(ed.p)];
+      ed.li = E.nearestInversion(ed.list, ed.midis.length ? ed.midis : state.piano);
+    }
+    if (ed.list.length) edApply(); else { ed.list = null; toast('잡을 수 있는 모양을 찾지 못했어요'); }
+  }
+  function edPlay() {
+    if (!ensureAudio()) return;
+    var notes = ed.kind === 'guitar'
+      ? ed.frets.map(function (f, s) { return f < 0 ? null : { m: E.TUNINGS[ed.tuning].midis[s] + f, s: s }; }).filter(Boolean)
+      : ed.midis.map(function (m) { return { m: m }; });
+    var kind = ed.kind;
+    Promise.all(notes.map(function (n) { return sample(kind, n.m).catch(function () { return null; }); })).then(function (bufs) {
+      var t = ctx.currentTime + 0.02, vol = kind === 'guitar' ? 0.75 : 0.75 / Math.sqrt(Math.max(1, notes.length));
+      notes.forEach(function (n, i) {
+        var w = kind === 'guitar' ? t + i * 0.035 : t;
+        if (bufs[i]) playBuffer(bufs[i], w, vol, kind === 'guitar' ? n.s : undefined);
+        else if (kind === 'guitar') playGuitar(n.m, w); else playPiano(n.m, w, 0.3);
+      });
+    });
+  }
+  function renderEditor() {
+    if (!ed) return;
+    var name = edName(), h = [];
+    h.push('<div class="ed-head"><b>' + (ed.item ? '코드 수정' : '코드 추가') + '</b><button type="button" data-ed="close">닫기</button></div>');
+    h.push('<form class="chord-find" id="edFind" autocomplete="off"><input id="edQuery" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+      'placeholder="코드 이름 (예: Am7, G/B)" value="' + esc(ed.query) + '"><button type="submit">보기</button></form>');
+    h.push('<div class="segmented ed-kind"><button type="button" data-ed="kind" data-v="guitar" aria-selected="' + (ed.kind === 'guitar') + '">기타</button>' +
+      '<button type="button" data-ed="kind" data-v="piano" aria-selected="' + (ed.kind === 'piano') + '">피아노</button></div>');
+    if (ed.list && ed.list.length > 1) {
+      var lab;
+      if (ed.kind === 'guitar') {
+        lab = '포지션 ' + (ed.li + 1) + '/' + ed.list.length + ' · ' + posText(ed.frets);
+      } else lab = (ed.li ? ed.li + '전위' : '기본형') + ' (' + (ed.li + 1) + '/' + ed.list.length + ')';
+      h.push('<div class="pos-nav"><button type="button" data-ed="prev" aria-label="이전">◀</button><span>' + lab + '</span><button type="button" data-ed="next" aria-label="다음">▶</button></div>');
+    }
+    if (ed.kind === 'guitar') {
+      var tm = E.TUNINGS[ed.tuning].midis, g = ['<div class="ed-grid"><div></div>'];
+      for (var s = 0; s < 6; s++) {
+        var f0 = ed.frets[s];
+        g.push('<button type="button" class="ed-open" data-ed="open" data-s="' + s + '" aria-label="' + (6 - s) + '번줄 개방/뮤트">' +
+          (f0 === 0 ? 'O' : f0 < 0 ? '×' : '') + '</button>');
+      }
+      for (var r = 0; r < 5; r++) {
+        var fr = ed.start + r;
+        g.push('<div class="ed-num">' + fr + '</div>');
+        for (s = 0; s < 6; s++) {
+          var on = ed.frets[s] === fr, fn = on && ed.fingers && ed.fingers.g[s];
+          g.push('<button type="button" class="ed-cell' + (fr === 1 ? ' first' : '') + '" data-ed="fret" data-s="' + s + '" data-f="' + fr + '" aria-label="' +
+            (6 - s) + '번줄 ' + fr + '프렛">' + (on ? '<span class="ed-dot">' + (fn || '') + '</span>' : '') + '</button>');
+        }
+      }
+      g.push('</div>');
+      h.push(g.join(''));
+      h.push('<div class="ed-start"><button type="button" data-ed="up"' + (ed.start <= 1 ? ' disabled' : '') + '>▲</button><span>' +
+        (ed.start === 1 ? '1~5프렛' : ed.start + '~' + (ed.start + 4) + '프렛') + (ed.tuning !== 'standard' ? ' · ' + esc(E.TUNINGS[ed.tuning].label) : '') +
+        '</span><button type="button" data-ed="down"' + (ed.start >= FRETS - 4 ? ' disabled' : '') + '>▼</button></div>');
+    } else {
+      h.push('<div class="ed-piano">' + (ed.midis.length ? D.piano(ed.midis).svg : '<p class="picker-empty">코드 이름을 입력하면 건반이 표시돼요.</p>') + '</div>');
+    }
+    h.push('<div class="ed-name">' + (name ? esc(E.pretty(name)) : '<span>' + (ed.kind === 'guitar' ? '코드표를 탭하거나 이름을 입력하세요' : '이름을 입력하세요') + '</span>') + '</div>');
+    h.push('<div class="overlay-actions"><button type="button" data-ed="play"' + (name ? '' : ' disabled') + '>▶ 소리</button>' +
+      '<button type="button" class="primary" data-ed="save"' + (name ? '' : ' disabled') + '>' + (ed.item ? '저장' : '악보에 추가') + '</button></div>');
+    $('edBox').innerHTML = h.join('');
+  }
+  $('chordEditor').addEventListener('click', function (e) {
+    if (e.target === $('chordEditor')) { closeEditor(); return; } // 바깥 탭 → 닫기
+    var b = e.target.closest('[data-ed]');
+    if (!b || !ed) return;
+    var act = b.dataset.ed, s = +b.dataset.s;
+    if (act === 'close') { closeEditor(); return; }
+    if (act === 'kind') {
+      if (ed.kind === b.dataset.v) return;
+      var prevMidis = edMidis();
+      ed.kind = b.dataset.v;
+      if (ed.p) edBuild();
+      else if (ed.kind === 'piano') ed.midis = prevMidis;
+      else if (prevMidis.length) { // 피아노 → 기타: 같은 코드의 기타 모양
+        var r = E.identify(prevMidis), p = r.type === 'chord' && E.parseChord(r.best.name);
+        if (p) { ed.p = p; edBuild(); }
+      }
+    } else if (act === 'prev' || act === 'next') {
+      ed.li = (ed.li + (act === 'next' ? 1 : ed.list.length - 1)) % ed.list.length; edApply(); edPlay();
+    } else if (act === 'open') {
+      ed.frets[s] = ed.frets[s] === 0 ? -1 : 0; ed.fingers = null; ed.list = null;
+      if (ed.frets[s] === 0 && ensureAudio()) playSound('guitar', E.TUNINGS[ed.tuning].midis[s], ctx.currentTime + 0.01, 0.9, s);
+    } else if (act === 'fret') {
+      var f = +b.dataset.f;
+      ed.frets[s] = ed.frets[s] === f ? -1 : f; ed.fingers = null; ed.list = null;
+      if (ed.frets[s] === f && ensureAudio()) playSound('guitar', E.TUNINGS[ed.tuning].midis[s] + f, ctx.currentTime + 0.01, 0.9, s);
+    } else if (act === 'up') ed.start = Math.max(1, ed.start - 1);
+    else if (act === 'down') ed.start = Math.min(FRETS - 4, ed.start + 1);
+    else if (act === 'play') { edPlay(); return; }
+    else if (act === 'save') { saveEditor(); return; }
+    renderEditor();
+  });
+  $('chordEditor').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!ed) return;
+    ed.query = $('edQuery').value;
+    var p = E.parseChord(ed.query);
+    if (!p) { toast('코드 이름을 알아보지 못했어요'); return; }
+    ed.p = p;
+    edBuild();
+    renderEditor();
+    edPlay();
+  });
+  function saveEditor() {
+    var ms = edMidis().sort(function (a, b) { return a - b; }), name = edName();
+    if (!ms.length || !name) { toast('음을 먼저 찍어 주세요'); return; }
+    var r = E.identify(ms), c = r.type === 'chord' ? r.candidates.filter(function (x) { return x.name === name; })[0] : null;
+    var data = { name: name, quality: c ? c.quality : (r.label || ''), kind: ed.kind, tuning: ed.tuning,
+      frets: ed.kind === 'guitar' ? ed.frets.slice() : [-1, -1, -1, -1, -1, -1], fingers: ed.kind === 'guitar' ? ed.fingers : null,
+      midis: ms, t0: state.sheet.transpose || 0 };
+    if (ed.item) { Object.keys(data).forEach(function (k) { ed.item[k] = data[k]; }); toast('코드를 고쳤어요'); }
+    else {
+      data.id = newId();
+      state.sheet.items.push(data);
+      if (ed.place) {
+        var pl = ed.place;
+        state.sheet.marks = state.sheet.marks.filter(function (m) { return !(m.l === pl.l && m.c === pl.c); });
+        state.sheet.marks.push({ l: pl.l, c: pl.c, id: data.id });
+      }
+      toast('악보에 추가했어요 · ' + state.sheet.items.length + '개');
+    }
+    closeEditor();
+    save(); renderSheet();
+  }
+
   // ---------- 코드 이름으로 찾기 ----------
   var found = null; // { name, list, idx } 기타 포지션 목록
   function showFound() {
@@ -750,9 +936,7 @@
         E.pretty(E.ROOT_NAMES[top % 12]) + (Math.floor(top / 12) - 1) + ' (' + (found.idx + 1) + '/' + found.list.length + ')';
       return;
     }
-    var fr = found.list[found.idx].filter(function (f) { return f > 0; });
-    var pos = fr.length ? Math.min.apply(null, fr) : 0;
-    $('posLabel').textContent = '포지션 ' + (found.idx + 1) + '/' + found.list.length + (pos > 3 ? ' · ' + pos + '프렛' : ' · 개방');
+    $('posLabel').textContent = '포지션 ' + (found.idx + 1) + '/' + found.list.length + ' · ' + posText(found.list[found.idx]);
   }
   function applyFound() {
     if (found.kind === 'piano') state.piano = found.list[found.idx].slice();
