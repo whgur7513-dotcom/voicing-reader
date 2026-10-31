@@ -10,7 +10,7 @@
   var BLACK = { 1: 1, 3: 1, 6: 1, 8: 1, 10: 1 };
 
   var DEFAULT = { mode: 'guitar', tuning: 'standard', guitar: [-1, 3, 2, 0, 0, 0], piano: [53, 57, 60, 64],
-    sheetOpen: false, sheet: normSheet(null) };
+    sheetOpen: false, sheets: [] };
   var state = load();
   var pick = null; // "다른 이름"에서 고른 이름
   var sel = -1; // 악보에서 선택한 칸
@@ -19,23 +19,34 @@
     try {
       var s = JSON.parse(localStorage.getItem(STORE_KEY));
       if (s && Array.isArray(s.guitar) && s.guitar.length === 6 && Array.isArray(s.piano) && E.TUNINGS[s.tuning]) {
-        var sheet = normSheet(s.sheet);
-        return { mode: s.mode === 'piano' ? 'piano' : 'guitar', tuning: s.tuning, guitar: s.guitar, piano: s.piano,
-          sheetOpen: !!s.sheetOpen, sheet: sheet, showInfo: !!s.showInfo, fingers: s.fingers || null };
+        // 악보 여러 개: 예전 한 개짜리(s.sheet)는 첫 악보로 옮김
+        var sheets = Array.isArray(s.sheets) ? s.sheets.map(normSheet) : (s.sheet ? [normSheet(s.sheet)] : []);
+        return withSheet({ mode: s.mode === 'piano' ? 'piano' : 'guitar', tuning: s.tuning, guitar: s.guitar, piano: s.piano,
+          sheetOpen: !!s.sheetOpen, sheets: sheets, sheetId: s.sheetId, showInfo: !!s.showInfo, fingers: s.fingers || null });
       }
     } catch (e) { /* 저장소 사용 불가 — 기본값으로 */ }
-    return JSON.parse(JSON.stringify(DEFAULT));
+    return withSheet(JSON.parse(JSON.stringify(DEFAULT)));
+  }
+  // state.sheet = 지금 열린 악보 (state.sheets 안의 같은 객체)
+  function withSheet(st) {
+    if (!st.sheets.length) st.sheets.push(normSheet(null));
+    st.sheet = st.sheets.filter(function (x) { return x.id === st.sheetId; })[0] || st.sheets[0];
+    st.sheetId = st.sheet.id;
+    return st;
   }
   // 예전 형식의 악보도 읽을 수 있게 빈 필드 채우기
   function normSheet(sh) {
     sh = sh && Array.isArray(sh.items) ? sh : {};
     var items = Array.isArray(sh.items) ? sh.items : [];
     items.forEach(function (it, i) { if (!it.id) it.id = 'i' + i + Date.now().toString(36); });
-    return { title: sh.title || '', items: items, lyrics: typeof sh.lyrics === 'string' ? sh.lyrics : '',
-      marks: Array.isArray(sh.marks) ? sh.marks : [], showDiagrams: !!sh.showDiagrams, transpose: sh.transpose | 0 };
+    return { id: sh.id || 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: sh.title || '', items: items,
+      lyrics: typeof sh.lyrics === 'string' ? sh.lyrics : '', marks: Array.isArray(sh.marks) ? sh.marks : [],
+      showDiagrams: !!sh.showDiagrams, transpose: sh.transpose | 0, updated: sh.updated || Date.now() };
   }
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 무시 */ }
+    if (state.sheetOpen && state.sheet) state.sheet.updated = Date.now();
+    // state.sheet 는 sheets 안의 객체를 가리키므로 따로 저장하지 않음
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state, function (k, v) { return k === 'sheet' ? undefined : v; })); } catch (e) { /* 무시 */ }
   }
 
   function tuningMidis() { return E.TUNINGS[state.tuning].midis; }
@@ -464,7 +475,8 @@
       midis: currentMidis().sort(function (a, b) { return a - b; })
     });
     save();
-    toast('악보에 담았어요 · ' + state.sheet.items.length + '개');
+    state.sheet.updated = Date.now();
+    toast('‘' + (state.sheet.title.trim() || '제목 없는 악보') + '’에 담았어요 · ' + state.sheet.items.length + '개');
   }
   var toastTimer = 0;
   function toast(msg) {
@@ -484,6 +496,7 @@
   function renderSheet() {
     var items = state.sheet.items;
     if (document.activeElement !== $('sheetTitle')) $('sheetTitle').value = state.sheet.title;
+    renderLibBtn();
     if (sel >= items.length) sel = -1;
     $('sheetGrid').innerHTML = items.map(function (it, i) {
       var tuning = it.kind === 'guitar' && it.tuning !== 'standard' ? '<span class="sc-tuning">' + esc(E.TUNINGS[it.tuning].label) + '</span>' : '';
@@ -766,6 +779,75 @@
     if (!fv.length || frets.indexOf(0) >= 0 || Math.max.apply(null, fv) <= 3) return '개방';
     return Math.min.apply(null, fv) + '프렛';
   }
+  // ---------- 내 악보 (여러 곡 보관) ----------
+  function sheetTitle(sh) { return sh.title.trim() || '제목 없는 악보'; }
+  function openSheet(id) {
+    state.sheet = state.sheets.filter(function (x) { return x.id === id; })[0] || state.sheets[0];
+    state.sheetId = state.sheet.id;
+    sel = -1; pickPos = null; lyricsEditing = false;
+    save(); renderSheet(); renderLibBtn();
+  }
+  function renderLibBtn() {
+    if ($('libBtn')) $('libBtn').textContent = '📂 내 악보 (' + state.sheets.length + ')';
+  }
+  function dateText(t) {
+    var d = new Date(t), now = new Date();
+    return d.toDateString() === now.toDateString() ? d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2)
+      : (d.getMonth() + 1) + '/' + d.getDate();
+  }
+  function renderLib() {
+    var list = state.sheets.slice().sort(function (a, b) { return b.updated - a.updated; });
+    $('libBox').innerHTML = '<div class="ed-head"><b>내 악보 (' + state.sheets.length + ')</b><button type="button" data-lib="close">닫기</button></div>' +
+      '<button type="button" class="lib-new" data-lib="new">＋ 새 악보 만들기</button>' +
+      list.map(function (sh) {
+        var info = '코드 ' + sh.items.length + '개' + (sh.lyrics.trim() ? ' · 가사' : '') + (sh.transpose ? ' · 키 ' + (sh.transpose > 0 ? '+' : '−') + Math.abs(sh.transpose) : '') + ' · ' + dateText(sh.updated);
+        return '<div class="lib-row' + (sh.id === state.sheetId ? ' cur' : '') + '">' +
+          '<button type="button" class="lib-main" data-lib="open" data-id="' + sh.id + '"><b>' + esc(sheetTitle(sh)) + '</b><span>' +
+          (sh.id === state.sheetId ? '지금 열린 악보 · ' : '') + info + '</span></button>' +
+          '<button type="button" data-lib="rename" data-id="' + sh.id + '">이름</button>' +
+          '<button type="button" data-lib="dup" data-id="' + sh.id + '">복제</button>' +
+          '<button type="button" class="danger" data-lib="del" data-id="' + sh.id + '">삭제</button></div>';
+      }).join('');
+  }
+  function newSheet() {
+    var sh = normSheet(null);
+    state.sheets.push(sh);
+    openSheet(sh.id);
+    toast('새 악보를 만들었어요');
+  }
+  on('libBtn', 'click', function () { renderLib(); $('libOverlay').hidden = false; });
+  on('newSheet', 'click', newSheet);
+  on('libOverlay', 'click', function (e) {
+    if (e.target === $('libOverlay')) { $('libOverlay').hidden = true; return; }
+    var b = e.target.closest('[data-lib]');
+    if (!b) return;
+    var act = b.dataset.lib, id = b.dataset.id;
+    var sh = state.sheets.filter(function (x) { return x.id === id; })[0];
+    if (act === 'close') { $('libOverlay').hidden = true; return; }
+    if (act === 'new') { $('libOverlay').hidden = true; newSheet(); return; }
+    if (act === 'open') { $('libOverlay').hidden = true; openSheet(id); return; }
+    if (act === 'rename') {
+      var t = prompt('악보 이름', sh.title);
+      if (t === null) return;
+      sh.title = t.trim(); sh.updated = Date.now();
+      save(); if (sh === state.sheet) renderSheet();
+    } else if (act === 'dup') {
+      var copy = normSheet(JSON.parse(JSON.stringify(sh)));
+      copy.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      copy.title = sheetTitle(sh) + ' 복사본'; copy.updated = Date.now();
+      state.sheets.push(copy); save(); toast('복제했어요');
+    } else if (act === 'del') {
+      if (!confirm('‘' + sheetTitle(sh) + '’ 악보를 지울까요? 되돌릴 수 없어요.')) return;
+      state.sheets = state.sheets.filter(function (x) { return x !== sh; });
+      if (!state.sheets.length) state.sheets.push(normSheet(null));
+      if (sh === state.sheet) {
+        var next = state.sheets.slice().sort(function (a, b) { return b.updated - a.updated; })[0];
+        openSheet(next.id);
+      } else save();
+    }
+    renderLib(); renderLibBtn();
+  });
+
   // ---------- 악보에서 직접 코드 추가·수정 (이름 입력 / 작은 코드표에 그리기) ----------
   var ed = null;
   function autoStart(fr) {

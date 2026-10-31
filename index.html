@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
   <header class="result" id="result" aria-live="polite">
@@ -76,6 +76,10 @@
     <section id="guitarView" class="guitar" aria-label="기타 지판"></section>
     <section id="pianoView" class="piano" aria-label="피아노 건반" hidden></section>
     <section id="sheetView" class="sheet" aria-label="코드 악보" hidden>
+      <div class="sheet-lib">
+        <button type="button" id="libBtn">📂 내 악보</button>
+        <button type="button" id="newSheet">＋ 새 악보</button>
+      </div>
       <input id="sheetTitle" class="sheet-title" type="text" placeholder="제목 없는 코드 악보" aria-label="악보 제목" autocomplete="off">
       <div class="sheet-tools" id="sheetTools">
         <button id="sheetPdf">PDF로 저장</button>
@@ -121,6 +125,9 @@
   <div class="overlay ed-overlay" id="chordEditor" hidden>
     <div class="overlay-box ed-box" id="edBox" role="dialog" aria-label="코드 추가"></div>
   </div>
+  <div class="overlay" id="libOverlay" hidden>
+    <div class="overlay-box lib-box" id="libBox" role="dialog" aria-label="내 악보"></div>
+  </div>
   <div class="toast" id="toast" role="status" hidden></div>
   <div class="overlay" id="imgOverlay" hidden>
     <div class="overlay-box">
@@ -133,9 +140,9 @@
     </div>
   </div>
 
-  <script src="guitar-shapes.js?v=16"></script>
-  <script src="chord.js?v=16"></script>
-  <script src="diagram.js?v=16"></script>
-  <script src="app.js?v=16"></script>
+  <script src="guitar-shapes.js?v=17"></script>
+  <script src="chord.js?v=17"></script>
+  <script src="diagram.js?v=17"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

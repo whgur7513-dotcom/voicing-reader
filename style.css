@@ -487,3 +487,19 @@ body[data-view="sheet"] .controls .chord-find, body[data-view="sheet"] .controls
 .picker-chips { padding-top: 8px; }
 .pick-chip { min-width: 58px; padding: 6px 8px; font-size: 14px; }
 .pc-diag svg { height: 40px; }
+
+/* 내 악보 */
+.sheet-lib { display: flex; gap: 8px; margin-bottom: 8px; }
+.sheet-lib button {
+  flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px;
+}
+.sheet-lib #newSheet { flex: 0 0 auto; padding: 0 16px; color: var(--accent); }
+.lib-box { max-width: 460px; max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.lib-new { min-height: 48px; border-radius: 12px; border: 1px dashed var(--accent); background: none; color: var(--accent); font-weight: 700; }
+.lib-row { display: flex; gap: 6px; align-items: stretch; padding: 6px; border-radius: 14px; border: 1px solid var(--line); }
+.lib-row.cur { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.lib-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; background: none; text-align: left; padding: 6px; }
+.lib-main b { font-size: 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-main span { font-size: 12px; color: var(--muted); }
+.lib-row > button:not(.lib-main) { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; font-weight: 600; }
+@media print { .sheet-lib { display: none !important; } }
