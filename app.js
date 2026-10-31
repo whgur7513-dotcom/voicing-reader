@@ -2,6 +2,8 @@
   'use strict';
   var E = window.ChordEngine;
   var $ = function (id) { return document.getElementById(id); };
+  // 업데이트 중 예전 HTML과 새 스크립트가 섞여도 멈추지 않게
+  var on = function (id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); };
   var STORE_KEY = 'voicing-reader-v1';
   var FRETS = 15;
   var PIANO_LO = 36, PIANO_HI = 84; // C2 ~ C6 (49건반)
@@ -30,7 +32,7 @@
     var items = Array.isArray(sh.items) ? sh.items : [];
     items.forEach(function (it, i) { if (!it.id) it.id = 'i' + i + Date.now().toString(36); });
     return { title: sh.title || '', items: items, lyrics: typeof sh.lyrics === 'string' ? sh.lyrics : '',
-      marks: Array.isArray(sh.marks) ? sh.marks : [], showDiagrams: !!sh.showDiagrams };
+      marks: Array.isArray(sh.marks) ? sh.marks : [], showDiagrams: !!sh.showDiagrams, transpose: sh.transpose | 0 };
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 무시 */ }
@@ -215,6 +217,7 @@
     $('tones').innerHTML = tones.map(chipHtml).join('');
     var paras = E.describe({ type: result.type, label: result.label, best: result.best, shown: shown });
     $('infoToggle').hidden = !paras.length;
+    if ($('shiftDown')) $('shiftDown').disabled = $('shiftUp').disabled = result.type === 'empty';
     $('infoToggle').textContent = state.showInfo ? '코드 설명 접기' : '코드 설명 보기';
     $('infoToggle').setAttribute('aria-expanded', !!state.showInfo);
     $('info').hidden = !paras.length || !state.showInfo;
@@ -364,18 +367,71 @@
     changed();
   });
 
+  // ---------- 반음 이동 ----------
+  var LETTER_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function transposeNote(nm, n) {
+    var pc = LETTER_PC[nm[0]];
+    for (var i = 1; i < nm.length; i++) pc += nm[i] === '#' ? 1 : -1;
+    return E.ROOT_NAMES[(((pc + n) % 12) + 12) % 12];
+  }
+  // "Cmaj7/E" → "Dmaj7/F#", "A C"(구성음 나열) → "B D"
+  function transposeName(name, n) {
+    if (!n) return name;
+    return name.split(' ').map(function (tok) {
+      return tok.replace(/^[A-G](?:bb|##|b|#)?/, function (m) { return transposeNote(m, n); })
+        .replace(/\/([A-G](?:bb|##|b|#)?)$/, function (_, m) { return '/' + transposeNote(m, n); });
+    }).join(' ');
+  }
+  // 기타 모양을 n프렛 옮김 (개방현도 함께 이동). 지판을 벗어나면 null
+  function shiftFrets(frets, n) {
+    var out = frets.map(function (f) { return f < 0 ? f : f + n; });
+    return out.every(function (f) { return f < 0 || f <= FRETS; }) && out.every(function (f) { return f >= -1; }) &&
+      !frets.some(function (f, i) { return f >= 0 && out[i] < 0; }) ? out : null;
+  }
+  // 악보용: n, n±12 중 지판 안에 들어가는 가장 낮은 자리
+  function fitFrets(frets, n) {
+    var c = [n, n + 12, n - 12, n + 24, n - 24].map(function (k) { return shiftFrets(frets, k); }).filter(Boolean);
+    c.sort(function (a, b) { return Math.max.apply(null, a) - Math.max.apply(null, b); });
+    return c[0] || frets;
+  }
+  function shiftCurrent(n) {
+    if (state.mode === 'guitar') {
+      var out = shiftFrets(state.guitar, n);
+      if (!out) { toast(n < 0 ? '개방현이 있어 더 내릴 수 없어요' : '15프렛을 넘어가요'); return; }
+      state.guitar = out;
+    } else {
+      var ms = state.piano.map(function (m) { return m + n; });
+      if (ms.some(function (m) { return m < PIANO_LO || m > PIANO_HI; })) { toast('건반 범위(C2~C6)를 벗어나요'); return; }
+      state.piano = ms;
+    }
+    changed();
+    playAll();
+  }
+
   // ---------- 악보 ----------
   var D = window.ChordDiagram;
   function diagram(it) {
+    it = tv(it);
     return it.kind === 'guitar' ? D.guitar(it.frets) : D.piano(it.midis);
   }
+  // 키 바꾸기: 담은 코드는 그대로 두고 화면에 보일 때만 옮긴다
+  // (t0 = 담을 때의 키 이동값 → 실제 이동 = 지금 값 − t0)
+  function shiftOf(it) { return (state.sheet.transpose || 0) - (it.t0 || 0); }
+  function tv(it) {
+    var n = shiftOf(it);
+    if (!n) return it;
+    return { id: it.id, kind: it.kind, tuning: it.tuning, name: transposeName(it.name, n),
+      frets: it.kind === 'guitar' ? fitFrets(it.frets, n) : it.frets,
+      midis: it.midis.map(function (m) { return m + n; }) };
+  }
+  function nameOf(it) { return tv(it).name; }
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function capture() {
     if (result.type === 'empty') return;
     var name = shown ? shown.name : result.type === 'single' ? result.tones[0].name
       : result.tones.map(function (t) { return t.name; }).join(' ');
     state.sheet.items.push({
-      id: newId(), name: name, quality: shown ? shown.quality : result.label, kind: state.mode, tuning: state.tuning,
+      id: newId(), t0: state.sheet.transpose || 0, name: name, quality: shown ? shown.quality : result.label, kind: state.mode, tuning: state.tuning,
       frets: state.guitar.slice(), midis: currentMidis().sort(function (a, b) { return a - b; })
     });
     save();
@@ -403,11 +459,14 @@
     $('sheetGrid').innerHTML = items.length ? items.map(function (it, i) {
       var tuning = it.kind === 'guitar' && it.tuning !== 'standard' ? '<span class="sc-tuning">' + esc(E.TUNINGS[it.tuning].label) + '</span>' : '';
       return '<button class="sheet-card' + (i === sel ? ' sel' : '') + '" data-i="' + i + '">' +
-        '<span class="sc-num">' + (i + 1) + '</span><span class="sc-name' + (it.name.length > 7 ? ' long' : '') + '">' + esc(E.pretty(it.name)) + '</span>' +
+        '<span class="sc-num">' + (i + 1) + '</span><span class="sc-name' + (nameOf(it).length > 7 ? ' long' : '') + '">' + esc(E.pretty(nameOf(it))) + '</span>' +
         '<span class="sc-diagram ' + it.kind + '">' + diagram(it).svg + '</span>' + tuning + '</button>';
     }).join('') : '<p class="sheet-empty">기타·피아노 화면에서 결과 카드의 ＋ 버튼을 누르면<br>코드가 여기에 차례로 담겨요.</p>';
     $('sheetBar').hidden = sel < 0;
     $('sheetPdf').disabled = $('sheetImgBtn').disabled = $('sheetClear').disabled = !hasContent();
+    var t = state.sheet.transpose || 0;
+    if ($('tLabel')) $('tLabel').textContent = t ? (t > 0 ? '+' : '−') + Math.abs(t) + ' (반음 ' + Math.abs(t) + '개 ' + (t > 0 ? '위' : '아래') + ')' : '원래 키';
+    if ($('tReset')) $('tReset').disabled = !t;
     renderLyrics();
     renderPicker();
   }
@@ -428,7 +487,7 @@
       return '<div class="ly-line">' + chars.map(function (ch, c) {
         var m = markAt(l, c), it = m && itemById(m.id);
         var on = pickPos && pickPos.l === l && pickPos.c === c;
-        var chord = it ? '<span class="ly-name">' + esc(E.pretty(it.name)) + '</span>' +
+        var chord = it ? '<span class="ly-name">' + esc(E.pretty(nameOf(it))) + '</span>' +
           (state.sheet.showDiagrams ? '<span class="ly-diag ' + it.kind + '">' + diagram(it).svg + '</span>' : '') : '';
         return '<button class="ly-cell' + (it ? ' has' : '') + (on ? ' sel' : '') + '" data-l="' + l + '" data-c="' + c + '">' +
           '<span class="ly-chord">' + chord + '</span><span class="ly-ch">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span></button>';
@@ -443,11 +502,11 @@
     $('pickerTitle').textContent = '‘' + (ch.trim() || '빈칸') + '’ 위에 넣을 코드';
     // 같은 이름·같은 보이싱은 한 번만
     var seen = {}, uniq = state.sheet.items.filter(function (it) {
-      var k = it.name + '|' + diagram(it).svg;
+      var k = nameOf(it) + '|' + diagram(it).svg;
       if (seen[k]) return false; seen[k] = 1; return true;
     });
     $('pickerChips').innerHTML = uniq.length ? uniq.map(function (it) {
-      return '<button class="pick-chip" data-id="' + it.id + '"><span class="pc-diag ' + it.kind + '">' + diagram(it).svg + '</span>' + esc(E.pretty(it.name)) + '</button>';
+      return '<button class="pick-chip" data-id="' + it.id + '"><span class="pc-diag ' + it.kind + '">' + diagram(it).svg + '</span>' + esc(E.pretty(nameOf(it))) + '</button>';
     }).join('') : '<p class="picker-empty">담은 코드가 없어요. 기타·피아노 화면에서 ＋ 버튼으로 먼저 담아 주세요.</p>';
     $('pickerRemove').hidden = !markAt(pickPos.l, pickPos.c);
   }
@@ -471,7 +530,7 @@
       sel = -1;
     }
     else if (act === 'load') {
-      var it = items[sel];
+      var it = tv(items[sel]);
       state.mode = it.kind;
       if (it.kind === 'guitar') { state.tuning = it.tuning; state.guitar = it.frets.slice(); }
       else state.piano = it.midis.slice();
@@ -555,7 +614,7 @@
         var w = c.measureText(ch).width;
         if (it) {
           c.font = CH_FONT;
-          w = Math.max(w, c.measureText(E.pretty(it.name)).width + 10, diag ? DIAG_W + 6 : 0);
+          w = Math.max(w, c.measureText(E.pretty(nameOf(it))).width + 10, diag ? DIAG_W + 6 : 0);
         }
         if (x + w > maxW && row.cells.length) { rows.push(row); row = { cells: [], chord: false }; x = 0; }
         row.cells.push({ x: x, ch: ch, it: it });
@@ -592,7 +651,7 @@
         c.strokeStyle = '#d0ccc4'; c.lineWidth = 1.5;
         c.strokeRect(x + 6, y + 6, cw - 12, ch - 12);
         c.fillStyle = '#8a8a90'; c.font = '600 15px ' + FONT; c.fillText(String(i + 1), x + 18, y + 30);
-        var size = 36, name = E.pretty(it.name);
+        var size = 36, name = E.pretty(nameOf(it));
         c.fillStyle = '#1c1c1e'; c.font = '750 ' + size + 'px ' + FONT;
         while (c.measureText(name).width > cw - 40 && size > 18) { size -= 2; c.font = '750 ' + size + 'px ' + FONT; }
         c.fillText(name, x + 18, y + 70);
@@ -604,7 +663,7 @@
         r.cells.forEach(function (cell) {
           var x = pad + cell.x;
           if (cell.it) {
-            c.fillStyle = '#c56f12'; c.font = CH_FONT; c.fillText(E.pretty(cell.it.name), x, y + 20);
+            c.fillStyle = '#c56f12'; c.font = CH_FONT; c.fillText(E.pretty(nameOf(cell.it)), x, y + 20);
             if (state.sheet.showDiagrams) {
               var d = diagram(cell.it), k = Math.min(DIAG_W / d.w, DIAG_H / d.h);
               c.drawImage(imgById[cell.it.id], x, y + 26, d.w * k, d.h * k);
@@ -639,6 +698,14 @@
     }
   });
   $('closeImg').addEventListener('click', function () { $('imgOverlay').hidden = true; });
+
+  function setTranspose(t) {
+    state.sheet.transpose = Math.max(-12, Math.min(12, t));
+    save(); renderSheet();
+  }
+  on('tDown', 'click', function () { setTranspose((state.sheet.transpose || 0) - 1); });
+  on('tUp', 'click', function () { setTranspose((state.sheet.transpose || 0) + 1); });
+  on('tReset', 'click', function () { setTranspose(0); });
 
   // ---------- 공통 ----------
   function render() {
@@ -680,6 +747,8 @@
     changed();
   });
   $('captureBtn').addEventListener('click', capture);
+  on('shiftDown', 'click', function () { shiftCurrent(-1); });
+  on('shiftUp', 'click', function () { shiftCurrent(1); });
   $('infoToggle').addEventListener('click', function () { state.showInfo = !state.showInfo; save(); renderResult(); });
   $('info').addEventListener('click', function (e) {
     if (e.target.closest('.info-close')) { state.showInfo = false; save(); renderResult(); }

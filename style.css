@@ -393,3 +393,24 @@ button { cursor: pointer; }
 @media (orientation: landscape) and (min-width: 600px) { .guitar.h { touch-action: pan-x; } }
 .dot.hit, .mark.note.hit { animation: pluck .28s ease-out; }
 @keyframes pluck { 0% { transform: scale(1.25); filter: brightness(1.3); } 100% { transform: scale(1); } }
+
+/* 반음 이동 */
+.card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.card-row .info-toggle { margin-top: 0; }
+.shift { display: flex; gap: 6px; }
+.shift button, .transpose button {
+  min-height: 40px; min-width: 56px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--chip); font-weight: 700; font-size: 14px; position: relative;
+}
+.shift button::after { content: ""; position: absolute; inset: -2px 0; }
+.shift button:disabled, .transpose button:disabled { opacity: .4; }
+.transpose { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
+.transpose button { min-height: 44px; background: var(--card); }
+.t-title { font-weight: 700; }
+.t-label { min-width: 88px; text-align: center; font-weight: 700; color: var(--accent); font-size: 14px; }
+@media (orientation: landscape) and (min-width: 600px) {
+  .card-row { flex-wrap: wrap; }
+  .shift { width: 100%; }
+  .shift button { flex: 1; }
+}
+@media print { .transpose { display: none !important; } }

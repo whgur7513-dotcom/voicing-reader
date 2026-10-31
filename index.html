@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
   <header class="result" id="result" aria-live="polite">
@@ -36,7 +36,13 @@
       </div>
     </div>
     <div class="chips" id="tones"></div>
-    <button class="info-toggle" id="infoToggle" aria-expanded="false" aria-controls="info">코드 설명 보기</button>
+    <div class="card-row">
+      <button class="info-toggle" id="infoToggle" aria-expanded="false" aria-controls="info">코드 설명 보기</button>
+      <div class="shift" role="group" aria-label="반음 이동">
+        <button id="shiftDown" aria-label="반음 내리기">♭ −1</button>
+        <button id="shiftUp" aria-label="반음 올리기">♯ +1</button>
+      </div>
+    </div>
     <div class="info" id="info" hidden></div>
     <div class="alts" id="altsWrap" hidden>
       <span class="alts-label">다른 이름</span>
@@ -65,6 +71,13 @@
         <button id="sheetPdf">PDF로 저장</button>
         <button id="sheetImgBtn">이미지로 저장</button>
         <button id="sheetClear" class="danger">모두 지우기</button>
+      </div>
+      <div class="transpose" role="group" aria-label="악보 키 바꾸기">
+        <span class="t-title">키</span>
+        <button id="tDown" aria-label="반음 내리기">♭ −1</button>
+        <span id="tLabel" class="t-label">원래 키</span>
+        <button id="tUp" aria-label="반음 올리기">♯ +1</button>
+        <button id="tReset">원래대로</button>
       </div>
       <div class="sheet-grid" id="sheetGrid"></div>
       <div class="lyrics-head">
@@ -106,8 +119,8 @@
     </div>
   </div>
 
-  <script src="chord.js"></script>
-  <script src="diagram.js"></script>
-  <script src="app.js"></script>
+  <script src="chord.js?v=11"></script>
+  <script src="diagram.js?v=11"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
