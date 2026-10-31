@@ -279,7 +279,48 @@
     $('guitarView').classList.toggle('h', land);
     $('guitarView').innerHTML = h.join('');
   }
+  // 손가락으로 줄을 가로질러 쓸면 스트럼 (세로 화면: 좌우로, 가로 화면: 위아래로)
+  var strum = null, suppressClick = false;
+  function stringAt(x, y) {
+    var el = document.elementFromPoint(x, y), c = el && el.closest('#guitarView [data-s]');
+    return c ? +c.dataset.s : null;
+  }
+  function pluck(s) {
+    var f = state.guitar[s];
+    if (f < 0) return; // 뮤트한 줄은 소리 없음
+    playNote(tuningMidis()[s] + f, s);
+    var dot = $('guitarView').querySelector('[data-s="' + s + '"][data-f="' + f + '"] .dot, [data-s="' + s + '"][data-f="0"] .mark.note');
+    if (dot) { dot.classList.remove('hit'); void dot.offsetWidth; dot.classList.add('hit'); }
+  }
+  $('guitarView').addEventListener('pointerdown', function (e) {
+    strum = { x: e.clientX, y: e.clientY, last: stringAt(e.clientX, e.clientY), active: false };
+  });
+  $('guitarView').addEventListener('pointermove', function (e) {
+    if (!strum) return;
+    var land = LAND.matches, dx = Math.abs(e.clientX - strum.x), dy = Math.abs(e.clientY - strum.y);
+    var along = land ? dy : dx, across = land ? dx : dy;
+    if (!strum.active) {
+      if (along > 10 && along > across) {
+        strum.active = true;
+        if (!ensureAudio()) { strum = null; return; }
+        if (strum.last !== null) pluck(strum.last);
+      } else if (across > 10) strum = null; // 스크롤 방향 → 스트럼 아님
+      return;
+    }
+    var s = stringAt(e.clientX, e.clientY);
+    if (s === null || s === strum.last) return;
+    if (strum.last === null) pluck(s);
+    else for (var k = strum.last + (s > strum.last ? 1 : -1); ; k += s > strum.last ? 1 : -1) { pluck(k); if (k === s) break; } // 빨리 쓸어 건너뛴 줄도
+    strum.last = s;
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    $('guitarView').addEventListener(ev, function () {
+      if (strum && strum.active) { suppressClick = true; setTimeout(function () { suppressClick = false; }, 350); }
+      strum = null;
+    });
+  });
   $('guitarView').addEventListener('click', function (e) {
+    if (suppressClick) { suppressClick = false; return; } // 스트럼 끝의 탭은 무시
     var b = e.target.closest('button[data-s]');
     if (!b) return;
     var s = +b.dataset.s, f = +b.dataset.f;
@@ -617,7 +658,7 @@
     $('tuningWrap').hidden = !g;
     $('tuning').value = state.tuning;
     $('hint').textContent = sh ? '칸을 탭하면 순서 바꾸기·불러오기·삭제를 할 수 있어요'
-      : g ? '같은 칸을 다시 탭하면 뮤트(×) · 맨 윗줄(0)은 개방현 O/× 전환' : '건반을 탭해 음을 켜고 끄세요 · 가장 낮은 음이 베이스';
+      : g ? '줄을 좌우로 쓸면 스트럼 · 같은 칸 다시 탭하면 뮤트(×) · 0번 줄은 개방현 O/×' : '건반을 탭해 음을 켜고 끄세요 · 가장 낮은 음이 베이스';
     if (sh) { renderSheet(); return; }
     sel = -1; pickPos = null;
     $('sheetBar').hidden = true; $('chordPicker').hidden = true;

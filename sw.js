@@ -1,5 +1,5 @@
 // 오프라인 캐시 (HTTPS 또는 localhost에서만 등록됨)
-var CACHE = 'voicing-reader-v9';
+var CACHE = 'voicing-reader-v10';
 var FILES = ['./', 'index.html', 'style.css', 'chord.js', 'diagram.js', 'app.js', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 

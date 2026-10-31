@@ -387,3 +387,9 @@ button { cursor: pointer; }
   .sheet { max-width: none; }
   .sheet-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
+
+/* 스트럼: 세로 화면은 페이지 세로 스크롤만, 가로 화면은 지판 가로 스크롤만 브라우저에 맡김 */
+.guitar { touch-action: pan-y; -webkit-touch-callout: none; }
+@media (orientation: landscape) and (min-width: 600px) { .guitar.h { touch-action: pan-x; } }
+.dot.hit, .mark.note.hit { animation: pluck .28s ease-out; }
+@keyframes pluck { 0% { transform: scale(1.25); filter: brightness(1.3); } 100% { transform: scale(1); } }
