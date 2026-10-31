@@ -356,10 +356,18 @@ button { cursor: pointer; }
 
   /* 가로 지판: 위 1번줄 ~ 아래 6번줄, 왼쪽 헤드. 줄 높이는 화면 높이에 맞춤 */
   .guitar.h {
-    --row: clamp(44px, calc((var(--land-h) - 52px) / 6), 72px);
+    --row: clamp(40px, calc((var(--land-h) - 100px) / 6), 62px);
     grid-template-columns: 22px 56px repeat(15, minmax(64px, 1fr));
-    max-width: none; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 10px;
+    max-width: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    padding: 12px 12px 8px 4px; border-radius: 16px; border: 1px solid var(--line); background: var(--card);
+    margin: 0; width: 100%; min-width: 0;
   }
+  .piano { margin: 0; width: 100%; }
+  /* 기타·피아노 화면은 남는 높이의 가운데에 */
+  body[data-view="guitar"] main, body[data-view="piano"] main {
+    display: flex; flex-direction: column; justify-content: center; min-height: var(--land-h); padding: 8px 0;
+  }
+  .guitar.h::-webkit-scrollbar { display: none; }
   .guitar.h .g-cell, .guitar.h .g-head { height: var(--row); }
   .guitar.h .g-head { display: grid; place-items: center; font-size: 13px; }
   .guitar.h .g-num { height: 22px; font-size: 13px; }

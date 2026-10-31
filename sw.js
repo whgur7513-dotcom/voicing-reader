@@ -1,5 +1,5 @@
 // 오프라인 캐시 (HTTPS 또는 localhost에서만 등록됨)
-var CACHE = 'voicing-reader-v7';
+var CACHE = 'voicing-reader-v9';
 var FILES = ['./', 'index.html', 'style.css', 'chord.js', 'diagram.js', 'app.js', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -15,7 +15,7 @@ self.addEventListener('activate', function (e) {
 // 네트워크 우선, 실패하면 캐시
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
-  e.respondWith(fetch(e.request).then(function (r) {
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(function (r) {
     var copy = r.clone();
     caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
     return r;
