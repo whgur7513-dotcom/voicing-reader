@@ -728,15 +728,22 @@
   function showFound() {
     var nav = $('posNav');
     if (!nav) return;
-    var on = found && state.mode === 'guitar' && !state.sheetOpen && found.list.length > 0;
+    var on = found && state.mode === found.kind && !state.sheetOpen && found.list.length > 0;
     nav.hidden = !on;
     if (!on) return;
+    if (found.kind === 'piano') {
+      var v = found.list[found.idx], top = v[v.length - 1];
+      $('posLabel').textContent = (found.idx ? found.idx + '전위' : '기본형') + ' · 맨 위 ' +
+        E.pretty(E.ROOT_NAMES[top % 12]) + (Math.floor(top / 12) - 1) + ' (' + (found.idx + 1) + '/' + found.list.length + ')';
+      return;
+    }
     var fr = found.list[found.idx].filter(function (f) { return f > 0; });
     var pos = fr.length ? Math.min.apply(null, fr) : 0;
     $('posLabel').textContent = '포지션 ' + (found.idx + 1) + '/' + found.list.length + (pos > 3 ? ' · ' + pos + '프렛' : ' · 개방');
   }
   function applyFound() {
-    state.guitar = found.list[found.idx].slice();
+    if (found.kind === 'piano') state.piano = found.list[found.idx].slice();
+    else state.guitar = found.list[found.idx].slice();
     found.keep = true; // 이번 변경으로는 목록을 닫지 않음
     changed();
     pickName(found.p);
@@ -758,14 +765,16 @@
     $('chordQuery').blur();
     ensureAudio();
     if (state.mode === 'piano') {
-      state.piano = E.pianoVoicing(p);
-      found = null;
-      changed(); pickName(p); playAll();
+      // 자리바꿈 목록. 처음 보여 줄 모양은 지금 건반과 오른손 이동이 가장 적은 것
+      var inv = E.pianoInversions(p);
+      if (!inv.length) { state.piano = E.pianoVoicing(p); found = null; changed(); pickName(p); playAll(); return; }
+      found = { kind: 'piano', p: p, list: inv, idx: E.nearestInversion(inv, state.piano) };
+      applyFound();
       return;
     }
     var list = E.chordVoicings(tuningMidis(), p, 6);
     if (!list.length) { toast('이 튜닝에서 잡을 수 있는 모양을 찾지 못했어요'); return; }
-    found = { p: p, list: list, idx: 0 };
+    found = { kind: 'guitar', p: p, list: list, idx: 0 };
     applyFound();
   });
   on('posPrev', 'click', function () { if (!found) return; found.idx = (found.idx + found.list.length - 1) % found.list.length; applyFound(); });

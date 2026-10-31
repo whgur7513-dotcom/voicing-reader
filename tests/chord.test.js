@@ -110,6 +110,20 @@
   pcheck('Bb7(#9)', 'Bb7#9'); pcheck('CΔ7', 'Cmaj7'); pcheck('Dø', 'Dm7b5'); pcheck('E7sus', 'E7sus4'); pcheck('G13', 'G13');
   check('알 수 없는 이름 → null', E.parseChord('Hello') === null && E.parseChord('Cxyz') === null, 'not null');
 
+  out('피아노 자리바꿈');
+  var nm = function (ms) { return ms.map(function (m) { return E.ROOT_NAMES[m % 12] + (Math.floor(m / 12) - 1); }).join(' '); };
+  var inv = E.pianoInversions(E.parseChord('C'));
+  check('C 자리바꿈 3개', inv.length === 3 && nm(inv[0]) === 'C2 C4 E4 G4' && nm(inv[1]) === 'C2 E4 G4 C5' && nm(inv[2]) === 'C2 G3 C4 E4',
+    inv.map(nm).join(' | '));
+  check('자리바꿈해도 이름은 C', inv.every(function (v) { return E.identify(v).best.name === 'C'; }), inv.map(function (v) { return E.identify(v).best.name; }).join(','));
+  var inv7 = E.pianoInversions(E.parseChord('G7'));
+  check('G7 자리바꿈 4개', inv7.length === 4 && inv7.every(function (v) { return E.identify(v).best.name === 'G7'; }), inv7.map(nm).join(' | '));
+  var gb = E.pianoInversions(E.parseChord('G/B'));
+  check('G/B 왼손 B2', gb.length === 3 && gb.every(function (v) { return v[0] === 47 && E.identify(v).best.name === 'G/B'; }), gb.map(nm).join(' | '));
+  var fInv = E.pianoInversions(E.parseChord('F'));
+  check('C 다음 F는 손 이동 적은 C-F-A', nm(fInv[E.nearestInversion(fInv, inv[0])]).indexOf('C4 F4 A4') >= 0,
+    nm(fInv[E.nearestInversion(fInv, inv[0])]));
+
   out('\n결과: ' + pass + ' 통과, ' + fail + ' 실패');
   global.__testResult = { pass: pass, fail: fail };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

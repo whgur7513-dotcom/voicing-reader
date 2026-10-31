@@ -435,6 +435,35 @@
     }
     return list;
   }
+  // 이름 → 피아노 자리바꿈 목록: 왼손은 C2 옥타브의 베이스(루트 또는 슬래시 베이스),
+  // 오른손은 코드음을 G3(55) 이상에서 촘촘히 쌓되 시작음을 바꿔 가며 (기본형, 1전위, 2전위 …)
+  function pianoInversions(p) {
+    var lh = 36 + p.bassPc;
+    var tones = p.pcs.filter(function (x) { return x !== p.bassPc || p.bassPc === p.rootPc || p.pcs.indexOf(x) < p.pcs.length - 1; })
+      .sort(function (a, b) { return mod12(a - p.rootPc) - mod12(b - p.rootPc); });
+    var out = [];
+    for (var k = 0; k < tones.length; k++) {
+      var rot = tones.slice(k).concat(tones.slice(0, k));
+      var m = 55 + mod12(rot[0] - 55), last, rh = [m];
+      last = m;
+      for (var i = 1; i < rot.length; i++) { var n = 48 + rot[i]; while (n <= last) n += 12; rh.push(n); last = n; }
+      if (last <= 84) out.push([lh].concat(rh));
+    }
+    return out;
+  }
+  // 앞 보이싱과 오른손 이동이 가장 적은 자리바꿈의 번호
+  function nearestInversion(list, prev) {
+    if (!prev || prev.length < 2) return 0;
+    var pr = prev.slice().sort(function (a, b) { return a - b; }).slice(1);
+    var best = 0, bestCost = Infinity;
+    list.forEach(function (v, i) {
+      var rh = v.slice(1), cost = 0;
+      rh.forEach(function (m) { cost += Math.min.apply(null, pr.map(function (q) { return Math.abs(q - m); })); });
+      if (cost < bestCost) { bestCost = cost; best = i; }
+    });
+    return best;
+  }
+
   // 이름 → 피아노 보이싱: 베이스는 C3 옥타브, 나머지는 그 위로 차례로
   function pianoVoicing(p) {
     var bass = 48 + p.bassPc, out = [bass], last = bass;
@@ -456,6 +485,6 @@
   global.ChordEngine = {
     ROOT_NAMES: ROOT_NAMES, TUNINGS: TUNINGS, TEMPLATES: TEMPLATES,
     identify: identify, findVoicing: findVoicing, findVoicings: findVoicings, parseChord: parseChord,
-    chordVoicings: chordVoicings, pianoVoicing: pianoVoicing, describe: describe, DESC: DESC, prettyDeg: prettyDeg, guitarMidis: guitarMidis, pretty: pretty, spell: spell
+    chordVoicings: chordVoicings, pianoVoicing: pianoVoicing, pianoInversions: pianoInversions, nearestInversion: nearestInversion, describe: describe, DESC: DESC, prettyDeg: prettyDeg, guitarMidis: guitarMidis, pretty: pretty, spell: spell
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
