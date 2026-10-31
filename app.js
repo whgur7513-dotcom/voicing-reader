@@ -179,30 +179,49 @@
   }
 
   // ---------- 기타 ----------
+  // 가로 화면이면 지판을 실제 기타처럼 가로로
+  var LAND = window.matchMedia('(orientation: landscape) and (min-width: 600px)');
   function renderGuitar() {
     var tm = tuningMidis(), ms = currentMidis(), bass = Math.min.apply(null, ms.length ? ms : [Infinity]);
-    var h = ['<div></div>'];
-    tm.forEach(function (m) { h.push('<div class="g-head">' + E.pretty(E.ROOT_NAMES[m % 12]) + '</div>'); });
-    // 개방현 줄
-    h.push('<div class="g-num">0</div>');
-    state.guitar.forEach(function (f, s) {
-      var m = tm[s] + 0, inner = '';
+    var land = LAND.matches;
+    function openCell(s) {
+      var f = state.guitar[s], m = tm[s], inner = '';
       if (f === 0) inner = '<span class="mark note' + (m === bass ? ' bass' : '') + '">' + noteName(m) + '</span>';
       else if (f < 0) inner = '<span class="mark">×</span>';
-      h.push('<button class="g-cell g-open' + (f === 0 ? ' on' : '') + '" data-s="' + s + '" data-f="0" aria-label="' +
-        (6 - s) + '번줄 개방현">' + inner + '</button>');
-    });
-    for (var f = 1; f <= FRETS; f++) {
-      h.push('<div class="g-num">' + f + '</div>');
-      for (var s = 0; s < 6; s++) {
-        var on = state.guitar[s] === f, m2 = tm[s] + f, inlay = '';
-        if ([3, 5, 7, 9, 15].indexOf(f) >= 0 && s === 2) inlay = '<span class="g-inlay" style="left:100%;transform:translateX(-50%)"></span>';
-        if (f === 12 && (s === 1 || s === 3)) inlay = '<span class="g-inlay" style="left:100%;transform:translateX(-50%)"></span>';
-        h.push('<button class="g-cell g-fret' + (f === 1 ? ' first' : '') + '" style="--sw:' + (3 - s * 0.35).toFixed(2) + 'px" data-s="' + s +
-          '" data-f="' + f + '" aria-label="' + (6 - s) + '번줄 ' + f + '프렛">' + inlay +
-          (on ? '<span class="dot' + (m2 === bass ? ' bass' : '') + '">' + noteName(m2) + '</span>' : '') + '</button>');
+      return '<button class="g-cell g-open' + (f === 0 ? ' on' : '') + '" data-s="' + s + '" data-f="0" aria-label="' +
+        (6 - s) + '번줄 개방현">' + inner + '</button>';
+    }
+    function fretCell(s, f) {
+      var on = state.guitar[s] === f, m = tm[s] + f, inlay = '';
+      // 인레이는 두 줄 사이 경계에 (세로: 오른쪽 경계, 가로: 아래쪽 경계)
+      var pos = land ? 'top:100%;transform:translateY(-50%)' : 'left:100%;transform:translateX(-50%)';
+      var single = land ? 3 : 2, dbl = land ? [2, 4] : [1, 3];
+      if ([3, 5, 7, 9, 15].indexOf(f) >= 0 && s === single) inlay = '<span class="g-inlay" style="' + pos + '"></span>';
+      if (f === 12 && dbl.indexOf(s) >= 0) inlay = '<span class="g-inlay" style="' + pos + '"></span>';
+      return '<button class="g-cell g-fret' + (f === 1 ? ' first' : '') + '" style="--sw:' + (3 - s * 0.35).toFixed(2) + 'px" data-s="' + s +
+        '" data-f="' + f + '" aria-label="' + (6 - s) + '번줄 ' + f + '프렛">' + inlay +
+        (on ? '<span class="dot' + (m === bass ? ' bass' : '') + '">' + noteName(m) + '</span>' : '') + '</button>';
+    }
+    var h = [], f, s;
+    if (land) {
+      // 위가 1번줄(고음 E), 아래가 6번줄, 왼쪽이 헤드
+      for (s = 5; s >= 0; s--) {
+        h.push('<div class="g-head">' + E.pretty(E.ROOT_NAMES[tm[s] % 12]) + '</div>', openCell(s));
+        for (f = 1; f <= FRETS; f++) h.push(fretCell(s, f));
+      }
+      h.push('<div></div>');
+      for (f = 0; f <= FRETS; f++) h.push('<div class="g-num">' + f + '</div>');
+    } else {
+      h.push('<div></div>');
+      tm.forEach(function (m) { h.push('<div class="g-head">' + E.pretty(E.ROOT_NAMES[m % 12]) + '</div>'); });
+      h.push('<div class="g-num">0</div>');
+      for (s = 0; s < 6; s++) h.push(openCell(s));
+      for (f = 1; f <= FRETS; f++) {
+        h.push('<div class="g-num">' + f + '</div>');
+        for (s = 0; s < 6; s++) h.push(fretCell(s, f));
       }
     }
+    $('guitarView').classList.toggle('h', land);
     $('guitarView').innerHTML = h.join('');
   }
   $('guitarView').addEventListener('click', function (e) {
@@ -217,11 +236,12 @@
   // ---------- 피아노 ----------
   function renderPiano() {
     var bass = Math.min.apply(null, state.piano.length ? state.piano : [Infinity]);
-    // 한 줄에 한 옥타브씩, 마지막 줄에 C6 포함
+    // 세로: 한 줄에 한 옥타브, 가로: 두 옥타브. 마지막 줄에 C6 포함
+    var span = LAND.matches ? 24 : 12, n = LAND.matches ? 15 : 8;
     var rows = [];
-    for (var lo = PIANO_LO; lo < PIANO_HI; lo += 12) {
-      var hi = lo + 12 >= PIANO_HI ? PIANO_HI : lo + 11, oct = lo / 12 - 1;
-      rows.push([lo, hi, 'C' + oct + ' – ' + (hi === PIANO_HI ? 'C' + (oct + 1) : 'B' + oct)]);
+    for (var lo = PIANO_LO; lo < PIANO_HI; lo += span) {
+      var hi = lo + span >= PIANO_HI ? PIANO_HI : lo + span - 1, oct = lo / 12 - 1, hiOct = Math.floor(hi / 12) - 1;
+      rows.push([lo, hi, 'C' + oct + ' – ' + (hi === PIANO_HI ? 'C' + hiOct : 'B' + hiOct)]);
     }
     $('pianoView').innerHTML = rows.map(function (r) {
       var whites = [], blacks = [], wi = 0;
@@ -229,14 +249,14 @@
         var on = state.piano.indexOf(m) >= 0, cls = (on ? ' on' : '') + (on && m === bass ? ' bass' : '');
         var label = on ? noteName(m) : (m % 12 === 0 ? 'C' + (m / 12 - 1) : '');
         if (BLACK[m % 12]) {
-          blacks.push('<button class="bkey' + cls + '" data-m="' + m + '" style="left:calc(100% / 8 * ' + wi + ' - 100% / 8 * .32)" aria-label="' +
+          blacks.push('<button class="bkey' + cls + '" data-m="' + m + '" style="left:calc(100% / var(--n) * ' + wi + ' - 100% / var(--n) * .32)" aria-label="' +
             E.ROOT_NAMES[m % 12] + (Math.floor(m / 12) - 1) + '">' + (on ? label : '') + '</button>');
         } else {
           whites.push('<button class="wkey' + cls + '" data-m="' + m + '" aria-label="' + E.ROOT_NAMES[m % 12] + (Math.floor(m / 12) - 1) + '">' + label + '</button>');
           wi++;
         }
       }
-      return '<div><div class="octave-label">' + r[2] + '</div><div class="keys">' + whites.join('') + blacks.join('') + '</div></div>';
+      return '<div><div class="octave-label">' + r[2] + '</div><div class="keys" style="--n:' + n + '">' + whites.join('') + blacks.join('') + '</div></div>';
     }).reverse().join('');
   }
   $('pianoView').addEventListener('click', function (e) {
@@ -545,6 +565,7 @@
     if (g) renderGuitar(); else renderPiano();
   }
   function changed() { pick = null; analyze(); save(); render(); }
+  LAND.addEventListener('change', render);
 
   $('tuning').innerHTML = Object.keys(E.TUNINGS).map(function (k) {
     return '<option value="' + k + '">' + E.TUNINGS[k].label + '</option>';

@@ -160,12 +160,12 @@ button { cursor: pointer; }
 .octave-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .keys { position: relative; height: 140px; display: flex; }
 .wkey {
-  flex: 0 0 calc(100% / 8); height: 100%; border: 1px solid var(--line); border-radius: 0 0 8px 8px;
+  flex: 0 0 calc(100% / var(--n, 8)); height: 100%; border: 1px solid var(--line); border-radius: 0 0 8px 8px;
   background: var(--white-key); color: #555; display: flex; align-items: flex-end; justify-content: center;
   padding-bottom: 8px; font-size: 12px; font-weight: 600;
 }
 .bkey {
-  position: absolute; top: 0; z-index: 2; width: calc(100% / 8 * .64); height: 60%;
+  position: absolute; top: 0; z-index: 2; width: calc(100% / var(--n, 8) * .64); height: 60%;
   border: 0; border-radius: 0 0 6px 6px; background: var(--black-key); color: #ddd;
   display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; font-size: 10px;
 }
@@ -300,3 +300,45 @@ button { cursor: pointer; }
 .info p { margin: 0 0 6px; }
 .info p:last-child { margin-bottom: 0; }
 .result-name.long { font-size: 25px; padding-top: 10px; }
+
+/* ---------- 가로 화면 ---------- */
+@media (orientation: landscape) and (min-width: 600px) {
+  body {
+    display: grid; grid-template-columns: minmax(250px, 32%) 1fr; gap: 14px; align-items: start;
+    padding-top: env(safe-area-inset-top);
+  }
+  body:has(.result[hidden]) { grid-template-columns: 1fr; }
+  .result {
+    top: 8px; margin: 8px 0; border-radius: 16px; border: 1px solid var(--line);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto;
+    padding: 12px 14px;
+  }
+  .result-name { font-size: 38px; }
+  .result-name.mid { font-size: 28px; }
+  .result-name.long { font-size: 22px; }
+  .result-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 104px; }
+  .info { max-height: none; }
+  main { min-width: 0; }
+  .controls { margin: 8px 0 10px; }
+  .hint { margin-top: 8px; }
+
+  /* 가로 지판: 위 1번줄 ~ 아래 6번줄, 왼쪽 헤드 */
+  .guitar.h {
+    grid-template-columns: 24px 46px repeat(15, minmax(42px, 1fr));
+    max-width: none; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 2px;
+  }
+  .guitar.h .g-cell { height: 44px; }
+  .guitar.h .g-head { height: 44px; display: grid; place-items: center; }
+  .guitar.h .g-num { height: 20px; }
+  .guitar.h .g-fret { border-bottom: 0; border-right: 2px solid var(--fret); }
+  .guitar.h .g-fret.first { border-top: 0; border-left: 6px solid var(--nut); }
+  .guitar.h .g-fret::before {
+    top: 50%; bottom: auto; left: 0; right: -2px; width: auto; height: var(--sw, 1.5px); transform: translateY(-50%);
+  }
+  .guitar.h .g-inlay { left: 50%; margin-left: -7px; }
+
+  .piano { max-width: none; gap: 10px; }
+  .keys { height: 112px; }
+  .sheet { max-width: none; }
+  .sheet-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
