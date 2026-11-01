@@ -594,6 +594,7 @@
     if (e.target.closest('[data-add]')) { sel = -1; pickPos = null; renderSheet(); openEditor({}); return; }
     var b = e.target.closest('button[data-i]');
     if (!b) return;
+    playChord(tv(state.sheet.items[+b.dataset.i]));
     sel = sel === +b.dataset.i ? -1 : +b.dataset.i;
     pickPos = null;
     renderSheet();
@@ -647,6 +648,9 @@
     var b = e.target.closest('button[data-l]');
     if (!b) return;
     var p = { l: +b.dataset.l, c: +b.dataset.c };
+    // 코드 이름·코드표를 탭하면 소리만, 글자를 탭하면 코드 고르기
+    var m = e.target.closest('.ly-chord-in') && markAt(p.l, p.c), it = m && itemById(m.id);
+    if (it) { playChord(tv(it)); return; }
     pickPos = pickPos && pickPos.l === p.l && pickPos.c === p.c ? null : p;
     sel = -1;
     renderSheet();
@@ -658,6 +662,8 @@
     var p = pickPos;
     state.sheet.marks = state.sheet.marks.filter(function (m) { return !(m.l === p.l && m.c === p.c); });
     state.sheet.marks.push({ l: p.l, c: p.c, id: b.dataset.id });
+    var it = itemById(b.dataset.id);
+    if (it) playChord(tv(it));
     pickPos = null; save(); renderSheet();
   });
   $('pickerRemove').addEventListener('click', function () {
@@ -921,12 +927,14 @@
     }
     if (ed.list.length) edApply(); else { ed.list = null; toast('잡을 수 있는 모양을 찾지 못했어요'); }
   }
-  function edPlay() {
+  function edPlay() { playChord(ed); }
+  // 기타는 6번줄부터 스트럼, 피아노는 한 번에. c = { kind, tuning, frets, midis }
+  function playChord(c) {
     if (!ensureAudio()) return;
-    var notes = ed.kind === 'guitar'
-      ? ed.frets.map(function (f, s) { return f < 0 ? null : { m: E.TUNINGS[ed.tuning].midis[s] + f, s: s }; }).filter(Boolean)
-      : ed.midis.map(function (m) { return { m: m }; });
-    var kind = ed.kind;
+    var notes = c.kind === 'guitar'
+      ? c.frets.map(function (f, s) { return f < 0 ? null : { m: E.TUNINGS[c.tuning].midis[s] + f, s: s }; }).filter(Boolean)
+      : c.midis.map(function (m) { return { m: m }; });
+    var kind = c.kind;
     Promise.all(notes.map(function (n) { return sample(kind, n.m).catch(function () { return null; }); })).then(function (bufs) {
       var t = ctx.currentTime + 0.02, vol = kind === 'guitar' ? 0.75 : 0.75 / Math.sqrt(Math.max(1, notes.length));
       notes.forEach(function (n, i) {
@@ -1116,7 +1124,7 @@
     $('sheetView').hidden = !sh;
     $('tuningWrap').hidden = !g;
     $('tuning').value = state.tuning;
-    $('hint').textContent = sh ? '칸을 탭하면 순서 바꾸기·불러오기·삭제를 할 수 있어요'
+    $('hint').textContent = sh ? '코드를 탭하면 소리가 나고, 순서 바꾸기·불러오기·삭제를 할 수 있어요'
       : g ? '줄을 좌우로 쓸면 스트럼 · 같은 칸 다시 탭하면 뮤트(×) · 0번 줄은 개방현 O/×' : '건반을 탭해 음을 켜고 끄세요 · 가장 낮은 음이 베이스';
     if (sh) { renderSheet(); return; }
     sel = -1; pickPos = null;
