@@ -533,9 +533,25 @@
         var chord = it ? '<span class="ly-name">' + esc(E.pretty(nameOf(it))) + '</span>' +
           (state.sheet.showDiagrams ? '<span class="ly-diag ' + it.kind + '">' + diagram(it).svg + '</span>' : '') : '';
         return '<button class="ly-cell' + (it ? ' has' : '') + (on ? ' sel' : '') + '" data-l="' + l + '" data-c="' + c + '">' +
-          '<span class="ly-chord">' + chord + '</span><span class="ly-ch">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span></button>';
+          '<span class="ly-chord">' + (chord ? '<span class="ly-chord-in">' + chord + '</span>' : '') + '</span><span class="ly-ch">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span></button>';
       }).join('') + '</div>';
     }).join('');
+    spaceChords();
+  }
+  // 코드는 폭 0으로 글자 위에 걸치므로, 앞 코드와 겹칠 때만 그 글자 앞을 띄움
+  function spaceChords() {
+    $('lyricsView').querySelectorAll('.ly-line').forEach(function (line) {
+      var prev = null;
+      line.querySelectorAll('.ly-cell.has').forEach(function (cell) { cell.style.marginLeft = ''; });
+      line.querySelectorAll('.ly-cell.has').forEach(function (cell) {
+        var box = cell.querySelector('.ly-chord-in'), r = box.getBoundingClientRect();
+        if (prev && Math.abs(r.top - prev.top) < 4 && r.left < prev.right + 6) {
+          cell.style.marginLeft = (prev.right + 6 - r.left) + 'px';
+          r = box.getBoundingClientRect();
+        }
+        prev = r;
+      });
+    });
   }
 
   function renderPicker() {
@@ -572,7 +588,7 @@
     pk.classList.toggle('below', below);
   }
   window.addEventListener('scroll', placePicker, { passive: true });
-  window.addEventListener('resize', placePicker);
+  window.addEventListener('resize', function () { spaceChords(); placePicker(); });
 
   $('sheetGrid').addEventListener('click', function (e) {
     if (e.target.closest('[data-add]')) { sel = -1; pickPos = null; renderSheet(); openEditor({}); return; }
@@ -673,18 +689,20 @@
     var rows = [], diag = !!state.sheet.showDiagrams;
     if (!state.sheet.lyrics.trim()) return rows;
     lyricLines().forEach(function (line, l) {
-      var chars = Array.from(line), row = { cells: [], chord: false }, x = 0;
+      // 코드는 글자 폭을 넓히지 않고 글자 왼쪽에서 시작. 앞 코드와 겹칠 때만 글자를 민다.
+      var chars = Array.from(line), row = { cells: [], chord: false }, x = 0, chordEnd = 0;
       chars.forEach(function (ch, ci) {
         var m = markAt(l, ci), it = m && itemById(m.id);
         c.font = LY_FONT;
-        var w = c.measureText(ch).width;
+        var w = c.measureText(ch).width, cw = 0;
         if (it) {
           c.font = CH_FONT;
-          w = Math.max(w, c.measureText(E.pretty(nameOf(it))).width + 10, diag ? DIAG_W + 6 : 0);
+          cw = Math.max(c.measureText(E.pretty(nameOf(it))).width + 10, diag ? DIAG_W + 6 : 0);
+          x = Math.max(x, chordEnd);
         }
-        if (x + w > maxW && row.cells.length) { rows.push(row); row = { cells: [], chord: false }; x = 0; }
+        if (x + w > maxW && row.cells.length) { rows.push(row); row = { cells: [], chord: false }; x = 0; chordEnd = 0; }
         row.cells.push({ x: x, ch: ch, it: it });
-        if (it) row.chord = true;
+        if (it) { row.chord = true; chordEnd = x + cw; }
         x += w;
       });
       rows.push(row);

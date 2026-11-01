@@ -256,10 +256,12 @@ button { cursor: pointer; }
 .ly-line.empty { height: 16px; }
 .ly-cell {
   display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
-  min-height: 46px; padding: 0 1px; border: 0; border-radius: 6px; background: transparent; color: var(--text);
+  min-height: 46px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text);
 }
 .ly-cell.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.ly-chord { display: flex; flex-direction: column; align-items: flex-start; min-height: 20px; padding-right: 6px; }
+/* 폭 0: 코드가 글자 폭을 넓히지 않고 글자 왼쪽에서 오른쪽으로 걸침 */
+.ly-chord { display: block; width: 0; min-height: 20px; overflow: visible; }
+.ly-chord-in { display: inline-flex; flex-direction: column; align-items: flex-start; }
 .ly-name { font-size: 15px; font-weight: 750; color: var(--accent); white-space: nowrap; line-height: 20px; }
 .ly-diag svg { display: block; height: auto; }
 .ly-diag.guitar svg { width: 40px; }
