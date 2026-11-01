@@ -263,9 +263,12 @@ button { cursor: pointer; }
 .ly-chord { display: block; width: 0; min-height: 20px; overflow: visible; }
 .ly-chord-in { display: inline-flex; flex-direction: column; align-items: flex-start; }
 .ly-name { font-size: 15px; font-weight: 750; color: var(--accent); white-space: nowrap; line-height: 20px; }
+/* 지판·건반의 .guitar/.piano 규칙(그리드, 가운데 정렬)이 따라오지 않게 */
+.ly-diag.guitar, .ly-diag.piano { display: block; margin: 0; max-width: none; width: auto; padding: 0; }
 .ly-diag svg { display: block; height: auto; }
-.ly-diag.guitar svg { width: 40px; }
-.ly-diag.piano svg { width: 56px; margin-top: 2px; }
+/* 코드표의 6번줄(왼쪽 끝 줄)이 글자 왼쪽과 같은 선에 오도록. 22 = diagram.js의 sx(0), 폭 100 기준 */
+.ly-diag.guitar svg { width: 40px; transform: translateX(-22%); }
+.ly-diag.piano svg { width: 56px; margin-top: 2px; transform: translateX(-1px); }
 .ly-ch { font-size: 19px; line-height: 26px; }
 .chord-picker {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--card); border-top: 1px solid var(--line);

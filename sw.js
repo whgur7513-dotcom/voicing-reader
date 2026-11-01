@@ -1,6 +1,6 @@
 // 오프라인 캐시 (HTTPS 또는 localhost에서만 등록됨)
-var CACHE = 'voicing-reader-v18';
-var FILES = ['./', 'index.html', 'style.css?v=18', 'guitar-shapes.js?v=18', 'chord.js?v=18', 'diagram.js?v=18', 'app.js?v=18', 'manifest.webmanifest',
+var CACHE = 'voicing-reader-v19';
+var FILES = ['./', 'index.html', 'style.css?v=19', 'guitar-shapes.js?v=19', 'chord.js?v=19', 'diagram.js?v=19', 'app.js?v=19', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', function (e) {

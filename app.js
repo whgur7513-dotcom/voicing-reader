@@ -750,7 +750,9 @@
             c.fillStyle = '#c56f12'; c.font = CH_FONT; c.fillText(E.pretty(nameOf(cell.it)), x, y + 20);
             if (state.sheet.showDiagrams) {
               var d = diagram(cell.it), k = Math.min(DIAG_W / d.w, DIAG_H / d.h);
-              c.drawImage(imgById[cell.it.id], x, y + 26, d.w * k, d.h * k);
+              // 코드표 왼쪽 끝 줄(기타 sx(0)=22, 건반 1)을 글자 왼쪽에 맞춤
+              var ox = (cell.it.kind === 'guitar' ? 22 : 1) * k;
+              c.drawImage(imgById[cell.it.id], x - ox, y + 26, d.w * k, d.h * k);
             }
           }
           c.fillStyle = '#1c1c1e'; c.font = LY_FONT; c.fillText(cell.ch, x, y + r.chordH + 28);
