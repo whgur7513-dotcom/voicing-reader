@@ -254,6 +254,7 @@ button { cursor: pointer; }
 .lyrics .sheet-empty.small { padding: 18px 0; font-size: 14px; }
 .ly-line { display: flex; flex-wrap: wrap; align-items: flex-end; margin-bottom: 4px; }
 .ly-line.empty { height: 16px; }
+.ly-word { display: flex; flex-wrap: wrap; align-items: flex-end; max-width: 100%; }
 .ly-cell {
   display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
   min-height: 46px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text);

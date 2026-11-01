@@ -527,29 +527,42 @@
     $('lyricsView').innerHTML = lyricLines().map(function (line, l) {
       var chars = Array.from(line);
       if (!chars.length) return '<div class="ly-line empty"></div>';
-      return '<div class="ly-line">' + chars.map(function (ch, c) {
+      var html = '', word = '';
+      chars.forEach(function (ch, c) {
         var m = markAt(l, c), it = m && itemById(m.id);
         var on = pickPos && pickPos.l === l && pickPos.c === c;
         var chord = it ? '<span class="ly-name">' + esc(E.pretty(nameOf(it))) + '</span>' +
           (state.sheet.showDiagrams ? '<span class="ly-diag ' + it.kind + '">' + diagram(it).svg + '</span>' : '') : '';
-        return '<button class="ly-cell' + (it ? ' has' : '') + (on ? ' sel' : '') + '" data-l="' + l + '" data-c="' + c + '">' +
+        var cell = '<button class="ly-cell' + (it ? ' has' : '') + (on ? ' sel' : '') + '" data-l="' + l + '" data-c="' + c + '">' +
           '<span class="ly-chord">' + (chord ? '<span class="ly-chord-in">' + chord + '</span>' : '') + '</span><span class="ly-ch">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span></button>';
-      }).join('') + '</div>';
+        // 낱말 단위로 묶어 줄바꿈이 낱말 중간에서 일어나지 않게
+        if (ch === ' ') { html += (word ? '<span class="ly-word">' + word + '</span>' : '') + cell; word = ''; }
+        else word += cell;
+      });
+      return '<div class="ly-line">' + html + (word ? '<span class="ly-word">' + word + '</span>' : '') + '</div>';
     }).join('');
     spaceChords();
   }
-  // 코드는 폭 0으로 글자 위에 걸치므로, 앞 코드와 겹칠 때만 그 글자 앞을 띄움
+  // 코드는 폭 0으로 글자 위에 걸치므로 가사는 움직이지 않는다.
+  // 앞 코드와 겹치면 그 코드만 한 단 위로 올림 (글자 바로 위 위치는 유지)
   function spaceChords() {
-    $('lyricsView').querySelectorAll('.ly-line').forEach(function (line) {
-      var prev = null;
-      line.querySelectorAll('.ly-cell.has').forEach(function (cell) { cell.style.marginLeft = ''; });
-      line.querySelectorAll('.ly-cell.has').forEach(function (cell) {
-        var box = cell.querySelector('.ly-chord-in'), r = box.getBoundingClientRect();
-        if (prev && Math.abs(r.top - prev.top) < 4 && r.left < prev.right + 6) {
-          cell.style.marginLeft = (prev.right + 6 - r.left) + 'px';
-          r = box.getBoundingClientRect();
-        }
-        prev = r;
+    var view = $('lyricsView');
+    if (!view.offsetParent) return; // 숨겨져 있으면 잴 수 없음
+    var boxes = Array.prototype.slice.call(view.querySelectorAll('.ly-chord-in'));
+    boxes.forEach(function (b) { b.style.marginBottom = ''; });
+    var rows = {};
+    boxes.forEach(function (b) {
+      var ch = b.closest('.ly-cell').querySelector('.ly-ch').getBoundingClientRect();
+      var r = b.getBoundingClientRect(), key = Math.round(ch.top);
+      (rows[key] = rows[key] || []).push({ b: b, left: r.left, right: r.right, h: r.height });
+    });
+    Object.keys(rows).forEach(function (k) {
+      var row = rows[k], ends = [], unit = Math.max.apply(null, row.map(function (c) { return c.h; })) + 4;
+      row.forEach(function (c) {
+        var t = 0;
+        while (ends[t] != null && c.left < ends[t] + 6) t++;
+        ends[t] = c.right;
+        if (t) c.b.style.marginBottom = t * unit + 'px';
       });
     });
   }
@@ -695,8 +708,8 @@
     var rows = [], diag = !!state.sheet.showDiagrams;
     if (!state.sheet.lyrics.trim()) return rows;
     lyricLines().forEach(function (line, l) {
-      // 코드는 글자 폭을 넓히지 않고 글자 왼쪽에서 시작. 앞 코드와 겹칠 때만 글자를 민다.
-      var chars = Array.from(line), row = { cells: [], chord: false }, x = 0, chordEnd = 0;
+      // 코드는 글자 폭을 넓히지 않고 글자 왼쪽에서 시작. 앞 코드와 겹치면 한 단 위로 (tier)
+      var chars = Array.from(line), row = { cells: [], tiers: 0, ends: [] }, x = 0;
       chars.forEach(function (ch, ci) {
         var m = markAt(l, ci), it = m && itemById(m.id);
         c.font = LY_FONT;
@@ -704,17 +717,29 @@
         if (it) {
           c.font = CH_FONT;
           cw = Math.max(c.measureText(E.pretty(nameOf(it))).width + 10, diag ? DIAG_W + 6 : 0);
-          x = Math.max(x, chordEnd);
         }
-        if (x + w > maxW && row.cells.length) { rows.push(row); row = { cells: [], chord: false }; x = 0; chordEnd = 0; }
-        row.cells.push({ x: x, ch: ch, it: it });
-        if (it) { row.chord = true; chordEnd = x + cw; }
+        // 낱말 첫 글자에서 낱말 전체가 안 들어가면 미리 줄바꿈
+        var ww = w;
+        if (ch !== ' ' && (ci === 0 || chars[ci - 1] === ' ')) {
+          c.font = LY_FONT;
+          for (var j = ci + 1; j < chars.length && chars[j] !== ' '; j++) ww += c.measureText(chars[j]).width;
+          if (ww > maxW) ww = w; // 한 줄보다 긴 낱말은 글자 단위로
+        }
+        if (x + ww > maxW && row.cells.length) { rows.push(row); row = { cells: [], tiers: 0, ends: [] }; x = 0; }
+        var cell = { x: x, ch: ch, it: it, tier: 0 };
+        if (it) {
+          while (row.ends[cell.tier] != null && x < row.ends[cell.tier]) cell.tier++;
+          row.ends[cell.tier] = x + cw;
+          row.tiers = Math.max(row.tiers, cell.tier + 1);
+        }
+        row.cells.push(cell);
         x += w;
       });
       rows.push(row);
     });
     rows.forEach(function (r) {
-      r.chordH = r.chord ? 26 + (diag ? DIAG_H + 4 : 0) : 0;
+      r.unit = 26 + (diag ? DIAG_H + 4 : 0);
+      r.chordH = r.tiers * r.unit;
       r.h = r.cells.length ? r.chordH + 40 : 22;
     });
     return rows;
@@ -753,12 +778,13 @@
         r.cells.forEach(function (cell) {
           var x = pad + cell.x;
           if (cell.it) {
-            c.fillStyle = '#c56f12'; c.font = CH_FONT; c.fillText(E.pretty(nameOf(cell.it)), x, y + 20);
+            var cy = y + (r.tiers - 1 - cell.tier) * r.unit; // 위 단일수록 위로
+            c.fillStyle = '#c56f12'; c.font = CH_FONT; c.fillText(E.pretty(nameOf(cell.it)), x, cy + 20);
             if (state.sheet.showDiagrams) {
               var d = diagram(cell.it), k = Math.min(DIAG_W / d.w, DIAG_H / d.h);
               // 코드표 왼쪽 끝 줄(기타 sx(0)=22, 건반 1)을 글자 왼쪽에 맞춤
               var ox = (cell.it.kind === 'guitar' ? 22 : 1) * k;
-              c.drawImage(imgById[cell.it.id], x - ox, y + 26, d.w * k, d.h * k);
+              c.drawImage(imgById[cell.it.id], x - ox, cy + 26, d.w * k, d.h * k);
             }
           }
           c.fillStyle = '#1c1c1e'; c.font = LY_FONT; c.fillText(cell.ch, x, y + r.chordH + 28);
